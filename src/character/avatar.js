@@ -1,6 +1,7 @@
 import {
   BoxGeometry, BufferGeometry, Color, CylinderGeometry, DodecahedronGeometry, DoubleSide,
-  DynamicDrawUsage, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, Object3D, Vector3,
+  DynamicDrawUsage, Float32BufferAttribute, Group, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial,
+  Object3D, Vector3,
 } from 'three';
 
 const PALETTE = {
@@ -35,7 +36,7 @@ function joint(parent, x, y, z) {
 }
 
 // Bake the fixed details on each moving joint into a single vertex-colored mesh.
-function bakeParts(parts, surface) {
+function bakeGeometry(parts) {
   const positions = [];
   const colors = [];
   const indices = [];
@@ -65,7 +66,7 @@ function bakeParts(parts, surface) {
   geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  return new Mesh(geometry, surface);
+  return geometry;
 }
 
 function createCloak(parent) {
@@ -137,7 +138,7 @@ export function createAvatar() {
     roughness: 0.77, metalness: 0.13, vertexColors: true, flatShading: true,
   });
   const { iron, edge, leather, dark, cloth, hood, burgundy, brass, rune } = PALETTE;
-  const attach = (parent, parts) => parent.add(bakeParts(parts, surface));
+  const attach = (parent, parts) => parent.add(new Mesh(bakeGeometry(parts), surface));
 
   attach(body, [
     [tapered, cloth, 0, 1.18, 0, 0.295, 0.61, 0.21],
@@ -321,4 +322,100 @@ export function createAvatar() {
       steel.color.setHex(tint ?? WEAPON_TINTS[itemId] ?? WEAPON_TINTS['trail-blade']);
     },
   };
+}
+
+// The simplified rig shares the local avatar's palette and silhouette. Every
+// visible peer is drawn through the same body, arm and leg instance buffers.
+export function createPeerAvatarBatch(scene, capacity) {
+  const box = new BoxGeometry(1, 1, 1);
+  const tapered = new CylinderGeometry(0.75, 1, 1, 5);
+  const facet = new DodecahedronGeometry(1);
+  const surface = new MeshStandardMaterial({
+    roughness: 0.78, metalness: 0.13, vertexColors: true, flatShading: true,
+  });
+  const { iron, leather, dark, cloth, hood, burgundy, brass } = PALETTE;
+
+  function createInstances(parts, count) {
+    const mesh = new InstancedMesh(bakeGeometry(parts), surface, count);
+    mesh.instanceMatrix.setUsage(DynamicDrawUsage);
+    mesh.count = 0;
+    // Peer selection already limits instances near the player.
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+    return mesh;
+  }
+
+  const bodies = createInstances([
+    [tapered, cloth, 0, 1.17, 0, 0.29, 0.64, 0.22],
+    [facet, iron, 0, 1.37, -0.078, 0.31, 0.28, 0.23],
+    [box, leather, 0, 1.018, 0, 0.52, 0.11, 0.42],
+    [box, brass, 0.016, 1.018, -0.226, 0.12, 0.075, 0.041],
+    [facet, hood, 0, 1.765, 0.051, 0.247, 0.277, 0.242],
+    [facet, iron, 0, 1.714, -0.114, 0.182, 0.187, 0.152],
+    [box, dark, 0, 1.77, -0.241, 0.227, 0.045, 0.028],
+    [tapered, burgundy, 0, 1.056, 0.245, 0.386, 1.03, 0.13],
+  ], capacity);
+  const arms = createInstances([
+    [facet, iron, 0, 0.029, 0, 0.172, 0.14, 0.185],
+    [tapered, leather, 0, -0.148, 0, 0.102, 0.31, 0.102],
+    [tapered, iron, 0, -0.347, -0.025, 0.103, 0.22, 0.092],
+    [box, dark, 0, -0.479, -0.041, 0.127, 0.12, 0.13],
+  ], capacity * 2);
+  const legs = createInstances([
+    [tapered, cloth, 0, -0.244, 0, 0.113, 0.51, 0.11],
+    [tapered, leather, 0, -0.613, 0, 0.103, 0.40, 0.101],
+    [facet, iron, 0, -0.424, -0.069, 0.104, 0.132, 0.112],
+    [box, leather, 0, -0.824, -0.076, 0.188, 0.165, 0.302],
+  ], capacity * 2);
+  box.dispose();
+  tapered.dispose();
+  facet.dispose();
+
+  const root = new Object3D();
+  const pivot = new Object3D();
+  const meshes = [bodies, arms, legs];
+  const limbMatrix = new Matrix4();
+  let count = 0;
+
+  function add(peer, height) {
+    const gait = Math.min(peer.speed / 4.3, 1) * (1 - peer.air * 0.84);
+    const stride = Math.sin(peer.phase) * gait;
+    root.position.set(peer.x, height + Math.abs(stride) * 0.042, peer.z);
+    root.rotation.set(-gait * 0.082, peer.yaw, stride * 0.038, 'YXZ');
+    root.updateMatrix();
+    bodies.setMatrixAt(count, root.matrix);
+
+    for (let i = 0; i < 2; i++) {
+      const side = i === 0 ? -1 : 1;
+      const instance = count * 2 + i;
+      pivot.position.set(side * 0.34, 1.45, 0);
+      pivot.rotation.set(side * stride * 0.54 + peer.air * 0.33, 0, side * 0.12);
+      pivot.updateMatrix();
+      limbMatrix.multiplyMatrices(root.matrix, pivot.matrix);
+      arms.setMatrixAt(instance, limbMatrix);
+
+      pivot.position.set(side * 0.143, 0.902, 0);
+      pivot.rotation.set(-side * stride * 0.59 + peer.air * (i === 0 ? 0.48 : -0.27), 0, 0);
+      pivot.updateMatrix();
+      limbMatrix.multiplyMatrices(root.matrix, pivot.matrix);
+      legs.setMatrixAt(instance, limbMatrix);
+    }
+    count++;
+  }
+
+  function finish() {
+    bodies.count = count;
+    arms.count = legs.count = count * 2;
+    for (const mesh of meshes) {
+      mesh.visible = mesh.count > 0;
+      if (!mesh.visible) continue;
+      const matrices = mesh.instanceMatrix;
+      matrices.clearUpdateRanges();
+      matrices.addUpdateRange(0, mesh.count * 16);
+      matrices.needsUpdate = true;
+    }
+    count = 0;
+  }
+
+  return { add, finish };
 }
