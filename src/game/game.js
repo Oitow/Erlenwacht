@@ -8,16 +8,21 @@ import { createCombat } from '../combat/combat.js';
 import { createInventory, INVENTORY_CAPACITY, ITEMS } from '../inventory/inventory.js';
 import { mountInventory } from '../inventory/view.js';
 import { createHud } from '../ui/hud.js';
-import { createOnlineClient } from '../online/client.js';
-import { createPeerView } from '../online/peers.js';
 import { createLoot } from './loot.js';
 import { createWardenContract } from './warden-contract.js';
 import { createProgression } from './progression.js';
 import { createExpedition } from './expedition.js';
+import { CLASSES, DEFAULT_CLASS_ID, getClass } from './classes.js';
+import { createProfessions } from './professions.js';
+import { createStarterJourney } from './starter-journey.js';
+import { createWayfires } from './wayfires.js';
 import { openSave } from './save.js';
 
 const GUIDE_RANGE = 3.4;
 const GATE_RANGE = 6;
+const WORKBENCH_RANGE = 4.5;
+const CLASS_RANGE = 7;
+const RESOURCE_RANGE = 3;
 const WEAPON_TINTS = { 'warden-blade': 0xe3c08a, 'seal-blade': 0xbda2ef, 'thorn-blade': 0x8fcb93 };
 const CONTROLS = {
   spell: 'cast',
@@ -38,6 +43,7 @@ export function startGame({ onError }) {
   const canvas = byId('viewport');
   const render = createRenderer(canvas);
   const world = createWorld(render.scene);
+  const starter = world.starter;
   const character = createCharacter(render.scene, world);
   const { position } = character;
   const camera = createCamera(render.camera, world);
@@ -56,23 +62,35 @@ export function startGame({ onError }) {
     : 0;
   const progression = createProgression(save.data?.progression, legacyKills * 22);
 
-  let hp = progression.maxHealth;
   let auto = save.data?.auto === true;
   let quest = save.data?.quest === 'complete' ? 'complete'
     : save.data?.quest === 'enclave' ? 'enclave' : 'trail';
-  let tutorial = save.data?.tutorial === 'path' ? 'path'
-    : save.data?.tutorial === 'loot' || legacyKills > 0 ? 'loot' : 'fight';
+  const journey = createStarterJourney(save.data, { reachedEnclave: quest !== 'trail', completedFight: legacyKills > 0 });
+  const wayfires = createWayfires(world, save.data?.wayfires, {
+    reachedEnclave: quest !== 'trail', reachedCrossroads: Boolean(expedition.checkpoint),
+  });
+  const professions = createProfessions(save.data?.professions, inventory, starter.nodes);
+  const explored = new Set(Array.isArray(save.data?.explored)
+    ? starter.landmarks.filter(landmark => save.data.explored.includes(landmark.id)).map(landmark => landmark.id)
+    : []);
+  const legacy = Boolean(save.data && !save.data.starterStage);
+  let selectedClass = CLASSES.find(entry => entry.id === save.data?.classId)?.id ?? (legacy ? DEFAULT_CLASS_ID : null);
+  let restId = wayfires.arrival(save.data?.restId) ? save.data.restId : null;
+  let characterClass = getClass(selectedClass);
+  let hp = progression.maxHealth + characterClass.maxHealthBonus;
   let dirty = false;
   let saveAvailable = true;
   let damageMultiplier = 1;
   let healthBonus = 0;
-  let onlineState = 'idle';
-  const networkPose = {};
+  let armor = 0;
+  let panelProximity = '';
+  let nextResourceRefresh = 0;
+  let tutorialLoot = null;
 
   const hud = createHud({
     onOpenChange: () => input.clear(),
     onUpgrade(id) {
-      if (!progression.upgrade(id, contract.skillUnlocked)) return false;
+      if (!progression.upgrade(id, contract.skillUnlocked, Boolean(selectedClass))) return false;
       const state = updateProgression();
       report(state.skills.find(skill => skill.id === id).name + ' verbessert.');
       dirty = true;
@@ -82,33 +100,18 @@ export function startGame({ onError }) {
     onChat: sendChat,
     onBag: () => bag.toggle(),
     onToggleAuto: toggleAuto,
-    onConnect: options => online.connect(options),
-    onDisconnect: () => online.disconnect(),
-  });
-  const peers = createPeerView(render.scene, world);
-  const online = createOnlineClient({
-    onStatus(status) {
-      onlineState = status.state;
-      if (status.state !== 'connected') {
-        peers.clear();
-        hud.onlineCount(0);
-      }
-      hud.onlineStatus(status);
-    },
-    onSnapshot({ count, players }) {
-      peers.applySnapshot(players);
-      hud.onlineCount(Math.max(0, count - 1));
-    },
-    onChat({ name, text, self }) {
-      hud.chat(self ? 'Du' : name, text, 'room');
-    },
+    onClass: chooseClass,
+    onCraft: craft,
+    onTravel: travelTo,
   });
 
   function flushSave() {
     if (!dirty) return;
     dirty = false;
     const written = save.write({
-      quest, tutorial, auto,
+      quest, auto, classId: selectedClass,
+      starterStage: journey.stage, wayfires: wayfires.serialize(), restId, explored: [...explored],
+      professions: professions.serialize(),
       wardenContract: contract.stage,
       expedition: expedition.serialize(),
       progression: progression.serialize(),
@@ -125,14 +128,18 @@ export function startGame({ onError }) {
     hud.chat(author, message, author === 'System' ? 'system' : 'npc');
   }
 
+  function maxHealth() {
+    return progression.maxHealth + characterClass.maxHealthBonus + healthBonus;
+  }
+
   function applyHealth(amount) {
-    const maxHealth = progression.maxHealth + healthBonus;
-    hp = Math.max(0, Math.min(maxHealth, hp + amount));
-    hud.health(hp, maxHealth);
+    const limit = maxHealth();
+    hp = Math.max(0, Math.min(limit, hp + amount));
+    hud.health(hp, limit);
   }
 
   function updateProgression() {
-    const state = progression.view(contract.skillUnlocked);
+    const state = progression.view(contract.skillUnlocked, Boolean(selectedClass), characterClass);
     hud.progress(state);
     return state;
   }
@@ -140,8 +147,7 @@ export function startGame({ onError }) {
   function gainXp(amount) {
     if (progression.gain(amount)) {
       if (hp > 0) applyHealth(Infinity);
-      report('Stufe ' + progression.level + ' erreicht. Im Fähigkeitenmenü kannst du einen Punkt vergeben.' +
-        (progression.level === 2 ? ' Dornlanze gelernt.' : ''), 'System', 6);
+      report('Stufe ' + progression.level + ' erreicht. Im Fähigkeitenmenü kannst du einen Punkt vergeben.', 'System', 6);
     }
     updateProgression();
     dirty = true;
@@ -154,15 +160,108 @@ export function startGame({ onError }) {
     flushSave();
   }
 
-  function respawn() {
-    const anchor = quest === 'trail' ? world.spawn : expedition.checkpoint ?? world.checkpoint;
-    combat.resetEncounter(world.relic.id);
-    combat.resetEncounter(world.expeditionBoss.id);
+  function canChooseClass() {
+    return distance(position, starter.camp) < CLASS_RANGE
+      || (quest !== 'trail' && distance(position, world.guide) < CLASS_RANGE);
+  }
+
+  function atWorkbench() {
+    return distance(position, starter.workbench) < WORKBENCH_RANGE;
+  }
+
+  function refreshPanels() {
+    const canChange = canChooseClass();
+    hud.classes({
+      selected: selectedClass, choices: CLASSES, canChange,
+      reason: canChange ? '' : 'Wechsle deine Klasse im Glutlager oder bei der Torwache.',
+    });
+    hud.professions({ ...professions.view(), atWorkbench: atWorkbench() });
+    hud.travel(wayfires.view(position));
+  }
+
+  function advanceTutorial(next) {
+    if (journey.advance(next)) dirty = true;
+  }
+
+  function chooseClass(id) {
+    const next = CLASSES.find(entry => entry.id === id);
+    if (!next || !canChooseClass() || id === selectedClass) return false;
+    selectedClass = id;
+    characterClass = next;
+    character.setClass(id);
+    applyHealth(Infinity);
+    advanceTutorial('gather');
+    dirty = true;
+    refreshPanels();
+    updateProgression();
+    report(next.name + ' gewählt. ' + next.primary.name + ' und ' + next.secondary.name + ' sind bereit.');
+    flushSave();
+    return true;
+  }
+
+  function craft(id) {
+    if (!atWorkbench()) return false;
+    const result = professions.craft(id);
+    if (!result.ok) return false;
+    const firstCraft = journey.stage === 'craft' || journey.stage === 'gather';
+    if (firstCraft) {
+      advanceTutorial('wayfire');
+      gainXp(18);
+    }
+    report('Hergestellt: ' + ITEMS[result.itemId].name + (result.rankUp ? ' · Berufsaufstieg!' : ''));
+    refreshPanels();
+    dirty = true;
+    flushSave();
+    return true;
+  }
+
+  function moveTo(anchor) {
     character.reset(anchor.x, anchor.z);
     camera.reset(position);
-    applyHealth(Infinity);
+    world.update(0, position);
     input.clear();
+  }
+
+  function travelTo(id) {
+    const destination = wayfires.select(id, position);
+    if (!destination) return false;
+    moveTo(destination.arrival);
+    restId = id;
+    refreshPanels();
+    report('Ankunft · ' + destination.name);
+    dirty = true;
+    flushSave();
+    return true;
+  }
+
+  function updateStarter(dt) {
+    if (world.setNodeAvailable) {
+      nextResourceRefresh -= dt;
+      if (nextResourceRefresh <= 0) {
+        nextResourceRefresh = 1;
+        for (const node of starter.nodes) world.setNodeAvailable(node.id, professions.available(node.id));
+      }
+    }
+    if (position.z < starter.trail.z) return;
+    for (const landmark of starter.landmarks) {
+      if (landmark.id === 'glutlager' || landmark.id === 'wegfeuer' || explored.has(landmark.id)
+        || distance(position, landmark) > 9) continue;
+      explored.add(landmark.id);
+      gainXp(12);
+      report('Entdeckt · ' + landmark.name + ' · +12 EP');
+    }
+  }
+
+  function respawn() {
+    const initial = legacy && quest === 'trail' ? starter.trail : world.spawn;
+    const anchor = wayfires.arrival(restId)
+      ?? (quest === 'trail' ? initial : expedition.checkpoint ?? world.checkpoint);
+    combat.resetEncounter(world.relic.id);
+    combat.resetEncounter(world.expeditionBoss.id);
+    moveTo(anchor);
+    applyHealth(Infinity);
     if (defeat.open) defeat.close();
+    refreshPanels();
   }
 
   const bag = mountInventory({
@@ -170,7 +269,7 @@ export function startGame({ onError }) {
     inventory,
     onOpenChange: () => input.clear(),
     onUse(id) {
-      if (hp === progression.maxHealth + healthBonus || !inventory.use(id)) return false;
+      if (hp === maxHealth() || !inventory.use(id)) return false;
       applyHealth(ITEMS[id].heal);
       flushSave();
       return true;
@@ -179,8 +278,10 @@ export function startGame({ onError }) {
 
   function inventoryChanged() {
     const weapon = inventory.equipped();
+    const bodyArmor = ITEMS[inventory.equipped('armor')];
     damageMultiplier = 1 + (ITEMS[weapon]?.spellPower ?? 0);
-    healthBonus = ITEMS[inventory.equipped('amulet')]?.maxHealth ?? 0;
+    healthBonus = (ITEMS[inventory.equipped('amulet')]?.maxHealth ?? 0) + (bodyArmor?.maxHealth ?? 0);
+    armor = bodyArmor?.armor ?? 0;
     character.setWeapon(weapon, WEAPON_TINTS[weapon]);
     applyHealth(0);
     hud.slots(inventory.slots().length, INVENTORY_CAPACITY);
@@ -189,6 +290,7 @@ export function startGame({ onError }) {
 
   function onDamage(amount) {
     if (hp === 0) return;
+    amount = Math.max(1, Math.round(amount * (1 - armor)));
     applyHealth(-amount);
     character.playHit();
     if (hp > 0) {
@@ -202,8 +304,9 @@ export function startGame({ onError }) {
   function onDefeat(drop) {
     loot.add(drop);
     for (const bonus of drop.bonusDrops ?? []) loot.add(bonus);
-    if (quest === 'trail' && tutorial === 'fight') {
-      tutorial = 'loot';
+    if (quest === 'trail' && journey.stage === 'fight') {
+      tutorialLoot = { x: drop.x, z: drop.z, name: ITEMS[drop.itemId].name };
+      advanceTutorial('loot');
       report('Erster Gegner besiegt. Geh zum leuchtenden Fundstück und sammle es ein.');
     }
     gainXp(drop.xp);
@@ -232,7 +335,7 @@ export function startGame({ onError }) {
     if (contract.accept()) {
       combat.setEncounterActive(world.relic.id, true);
       updateProgression();
-      report('Siegelbruch gelernt. Brich damit den Schild des Reliktwächters und greif mit der Rune an.', 'Torwache', 6);
+      report('Siegelbruch gelernt. Öffne damit den Schild des Reliktwächters und setz mit deinem Angriff nach.', 'Torwache', 6);
       dirty = true;
       return;
     }
@@ -265,33 +368,81 @@ export function startGame({ onError }) {
     }
   }
 
-  function interactWithWorld(drop, nearGuide) {
-    if (drop) {
-      const quantity = loot.collect(drop, inventory);
-      if (quantity) {
-        if (quest === 'trail' && tutorial === 'loot') tutorial = 'path';
-        report('+' + quantity + ' ' + ITEMS[drop.itemId].name);
-      } else {
+  function interactionAt(wayfire) {
+    const drop = loot.closest(position);
+    if (drop) return { kind: 'loot', drop, label: ITEMS[drop.itemId].name
+      + (drop.quantity > 1 ? ' ×' + drop.quantity : '') + ' aufnehmen' };
+    if (quest !== 'trail' && distance(position, world.guide) < GUIDE_RANGE) {
+      return { kind: 'guide', label: 'Mit Torwache sprechen' };
+    }
+    if (atWorkbench()) return { kind: 'professions', label: 'Werkbank benutzen' };
+    if (journey.stage === 'class' && canChooseClass()) return { kind: 'classes', label: 'Klasse wählen' };
+    const node = starter.nodes.find(candidate => distance(position, candidate) < RESOURCE_RANGE
+      && professions.available(candidate.id));
+    if (node) return { kind: 'gather', node, label: node.name + ' sammeln' };
+    if (wayfire) return { kind: 'travel', label: wayfire.name + ' · Reisen' };
+    return null;
+  }
+
+  function interactWithWorld(interaction) {
+    if (!interaction) return;
+    if (interaction.kind === 'loot') {
+      const quantity = loot.collect(interaction.drop, inventory);
+      if (!quantity) {
+        hud.notice('Dein Beutel ist voll.');
+        return;
+      }
+      if (journey.stage === 'loot') {
+        tutorialLoot = null;
+        advanceTutorial('gate');
+      }
+      report('+' + quantity + ' ' + ITEMS[interaction.drop.itemId].name);
+      return;
+    }
+    if (interaction.kind === 'gather') {
+      const result = professions.gather(interaction.node.id);
+      if (result.ok) {
+        if (journey.stage === 'gather') advanceTutorial('craft');
+        world.setNodeAvailable?.(interaction.node.id, false);
+        refreshPanels();
+        report('+' + result.quantity + ' ' + ITEMS[result.itemId].name + (result.rankUp ? ' · Berufsaufstieg!' : ''));
+      } else if (result.reason === 'full') {
         hud.notice('Dein Beutel ist voll.');
       }
-    } else if (nearGuide) {
-      speakToGuide();
+      return;
     }
+    if (interaction.kind === 'guide') {
+      speakToGuide();
+      return;
+    }
+    refreshPanels();
+    hud.openPage(interaction.kind);
   }
 
   function currentObjective() {
     if (quest === 'trail') {
-      if (tutorial === 'fight') {
-        return ['Laufe zum Lager und triff einen Gegner aus der Nähe mit der Rune.', world.training];
+      switch (journey.stage) {
+        case 'class':
+          return ['Wähle im Glutlager deine Klasse. Jede bringt zwei eigene Fähigkeiten mit.', starter.camp];
+        case 'gather': {
+          const node = starter.nodes.find(candidate => professions.available(candidate.id));
+          return ['Sammle Holz, Kräuter oder Erz an einem markierten Vorkommen.', node ?? starter.workbench];
+        }
+        case 'craft':
+          return ['Kehre zur Werkbank zurück. Stelle aus deinem Fund ein erstes Ausrüstungsteil oder einen Trank her.', starter.workbench];
+        case 'wayfire':
+          return ['Steige zum Wegfeuer ab. Entdeckte Feuer verbinden die Regionen per Schnellreise.', starter.beacon];
+        case 'fight':
+          return ['Folge den Laternen zum ersten Schattenwesen. Setze deine Klassenfähigkeiten ein.', world.training];
+        case 'loot':
+          return ['Sammle einen leuchtenden Fund ein. Folge danach den Laternen zur Enklave.', tutorialLoot ?? world.training];
+        default:
+          return ['Folge den Laternen bis zum Tor der Enklave.', world.gate];
       }
-      if (tutorial === 'loot') {
-        return ['Sammle leuchtende Beute ein oder folge den Laternen weiter zur Enklave.', world.gate];
-      }
-      return ['Folge den Laternen bis zum Tor. Der Beutel enthält deine Beute und Heiltränke.', world.gate];
     }
     if (quest === 'enclave') return ['Sprich mit der Torwache im Innenhof.', world.guide];
     if (contract.encounterActive) {
-      return ['Brich den Schild des Reliktwächters mit Siegelbruch. Greif dann mit der Rune an.', world.relic];
+      return ['Brich den Schild des Reliktwächters mit Siegelbruch. Setze danach deine Angriffe ein.', world.relic];
     }
     if (contract.stage === 'return') return ['Melde den Sieg bei der Torwache.', world.guide];
     if (contract.stage === 'offer') return ['Hol dir einen Auftrag bei der Torwache.', world.guide];
@@ -300,20 +451,11 @@ export function startGame({ onError }) {
 
   function sendChat(text) {
     const message = text.trim();
-    if (!message) return false;
-    if (!message.startsWith('/') && online.connected) {
-      if (online.chat(message)) return true;
-      hud.chat('System', 'Die Nachricht wurde nicht gesendet. Versuche es erneut.');
-      return false;
-    }
-    if (!message.startsWith('/') && (onlineState === 'connecting' || onlineState === 'reconnecting')) {
-      hud.chat('System', 'Warte auf die Verbindung, um im Raum zu schreiben.');
-      return false;
-    }
+    if (!message) return;
     hud.chat('Du', message, 'local');
     switch (message.toLowerCase()) {
       case '/hilfe':
-        hud.chat('System', '/quest · aktives Ziel | /ort · Gebiet | /wache · Hinweis der Torwache');
+        hud.chat('System', '/quest · aktives Ziel | /ort · aktuelles Gebiet | /wache · Hinweis der Torwache');
         break;
       case '/quest':
         hud.chat('System', currentObjective()[0]);
@@ -328,10 +470,9 @@ export function startGame({ onError }) {
         if (message.startsWith('/')) hud.chat('System', 'Unbekannter Befehl. Zeige mit /hilfe die Befehle an.');
         break;
     }
-    return true;
   }
 
-  function updateAdventure(dt) {
+  function update(dt) {
     const actions = input.sample();
     if (hp === 0) {
       flushSave();
@@ -356,9 +497,13 @@ export function startGame({ onError }) {
     character.update(dt, actions);
     camera.update(dt, position);
     world.update(dt, position);
+    updateStarter(dt);
 
     if (quest === 'trail' && distance(position, world.gate) < GATE_RANGE) {
       quest = 'enclave';
+      advanceTutorial('done');
+      wayfires.discover('enclave');
+      restId = 'enclave';
       applyHealth(Infinity);
       report('Rastpunkt erreicht · Enklave');
       dirty = true;
@@ -369,33 +514,49 @@ export function startGame({ onError }) {
       gainXp(28);
       report(discovery === world.landmarks.crossroads.name ? 'Rastpunkt erreicht · ' + discovery : discovery + ' entdeckt.');
     }
-    const nearGuide = quest !== 'trail' && distance(position, world.guide) < GUIDE_RANGE;
-    const drop = loot.closest(position);
-    if (actions.interact) interactWithWorld(drop, nearGuide);
+    const wayfire = wayfires.nearby(position);
+    if (wayfire) {
+      if (wayfires.discover(wayfire.id)) report('Wegfeuer entdeckt · ' + wayfire.name);
+      if (restId !== wayfire.id) {
+        restId = wayfire.id;
+        dirty = true;
+      }
+      if (wayfire.id === 'pass' && journey.stage === 'wayfire') advanceTutorial('fight');
+    }
+    if (quest === 'trail' && position.z <= starter.trail.z) advanceTutorial('fight');
+    const proximity = Number(canChooseClass()) + ':' + Number(atWorkbench()) + ':' + (wayfire?.id ?? '');
+    if (proximity !== panelProximity) {
+      panelProximity = proximity;
+      refreshPanels();
+    }
+    const interaction = interactionAt(wayfire);
+    if (actions.interact) interactWithWorld(interaction);
 
     combat.update(dt, {
       position, cast: actions.cast, breakSeal: contract.skillUnlocked && actions.breakSeal,
-      arc: progression.arcUnlocked && actions.arc,
+      facing: character.facing, classId: characterClass.id,
+      arc: (selectedClass || progression.arcUnlocked) && actions.arc,
       burstRank: progression.rank('rune'), arcRank: progression.rank('arc'), sealRank: progression.rank('seal'),
       auto, damageMultiplier: damageMultiplier * (1 + (progression.level - 1) * 0.035),
       onDamage, onDefeat, onCast: character.playCast,
     });
     loot.update(dt, position);
     const [objectiveText, target] = currentObjective();
-    const nextDrop = actions.interact ? loot.closest(position) : drop;
+    const nextInteraction = actions.interact ? interactionAt(wayfire) : interaction;
     const relic = combat.encounterStatus(world.relic.id, position);
     const watchkeeper = combat.encounterStatus(world.expeditionBoss.id, position);
     hud.update(dt, {
       region: world.regionAt(position.x, position.z),
       objectiveText,
+      tutorial: journey.label && { label: journey.label },
       targetName: target?.name,
       targetDistance: target ? distance(position, target) : 0,
       bearing: target && camera.bearingTo(target.x - position.x, target.z - position.z),
-      interaction: nextDrop ? ITEMS[nextDrop.itemId].name + ' aufnehmen' : nearGuide ? 'Mit Torwache sprechen' : '',
+      interaction: nextInteraction?.label ?? '',
       cooldown: combat.cooldown,
       sealUnlocked: contract.skillUnlocked,
       sealCooldown: combat.sealCooldown,
-      arcUnlocked: progression.arcUnlocked,
+      arcUnlocked: Boolean(selectedClass) || progression.arcUnlocked,
       arcCooldown: combat.arcCooldown,
       boss: relic ? { ...relic, name: 'Reliktwächter' }
         : watchkeeper && { ...watchkeeper, name: 'Hüter der Krähenwarte' },
@@ -413,22 +574,16 @@ export function startGame({ onError }) {
   defeat.addEventListener('cancel', event => event.preventDefault());
   window.addEventListener('pagehide', flushSave);
   inventory.subscribe(inventoryChanged);
+  character.setClass(characterClass.id);
   inventoryChanged();
   dirty = false;
   hud.auto(auto);
   updateProgression();
-  hud.chat('System', 'Tippe /hilfe für Spielbefehle. Einen Raum findest du im Menü unter Online.');
+  hud.chat('System', 'Willkommen am Aschenpass. Tippe /hilfe für Spielbefehle.');
   respawn();
 
   startLoop({
-    update(dt) {
-      updateAdventure(dt);
-      if (online.connected) {
-        online.update(dt, character.getNetworkPose(networkPose));
-        peers.update(dt, position);
-      }
-    },
-    render: render.render, onError,
+    update, render: render.render, onError,
     performanceSample(fps) {
       render.adapt(fps);
       hud.performance(fps);

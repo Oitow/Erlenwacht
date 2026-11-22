@@ -40,8 +40,8 @@ export function createProgression(saved, legacyXp = 0) {
     spent += upgrades;
   }
 
-  function unlocked(id, hasSeal) {
-    return id === 'rune' || (id === 'arc' && level >= 2) || (id === 'seal' && hasSeal);
+  function unlocked(id, hasSeal, hasClass) {
+    return id === 'rune' || (id === 'arc' && (hasClass || level >= 2)) || (id === 'seal' && hasSeal);
   }
 
   return {
@@ -56,22 +56,26 @@ export function createProgression(saved, legacyXp = 0) {
       recalculate();
       return level > previousLevel;
     },
-    upgrade(id, hasSeal) {
-      if (!unlocked(id, hasSeal) || ranks[id] >= MAX_RANK || spent >= level - 1) return false;
+    upgrade(id, hasSeal, hasClass) {
+      if (!unlocked(id, hasSeal, hasClass) || ranks[id] >= MAX_RANK || spent >= level - 1) return false;
       ranks[id]++;
       spent++;
       return true;
     },
-    view(hasSeal) {
+    view(hasSeal, hasClass, characterClass) {
       return {
         level, xp, nextXp: level < MAX_LEVEL ? threshold(level) : 0,
         points: level - 1 - spent,
-        skills: SKILLS.map(skill => ({
-          ...skill,
-          rank: ranks[skill.id],
-          maxRank: MAX_RANK,
-          unlocked: unlocked(skill.id, hasSeal),
-        })),
+        skills: SKILLS.map(skill => {
+          const ability = skill.id === 'rune' ? characterClass?.primary
+            : skill.id === 'arc' ? characterClass?.secondary : null;
+          return {
+            ...skill, ...ability,
+            rank: ranks[skill.id], maxRank: MAX_RANK,
+            requirement: skill.id === 'arc' ? 'Wähle eine Klasse oder erreiche Stufe 2.' : skill.requirement,
+            unlocked: unlocked(skill.id, hasSeal, hasClass),
+          };
+        }),
       };
     },
     serialize() { return { totalXp, ranks: { ...ranks } }; },

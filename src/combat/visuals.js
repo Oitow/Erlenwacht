@@ -118,12 +118,17 @@ export function createLanceEffect(group, world, tint) {
   group.add(mesh);
 
   return {
-    show(x, z, aimX, aimZ, length, width) {
+    setTint(value) {
+      material.uniforms.tint.value.setHex(value);
+    },
+    show(x, z, aimX, aimZ, length, width, angle = 0) {
       const ground = world.heightAt(x, z);
       mesh.position.set(x, ground + 0.14, z);
       for (let i = 0; i < positions.count; i++) {
-        const forward = uv.getY(i) * length;
-        const side = (uv.getX(i) * 2 - 1) * width;
+        const row = uv.getY(i) * length;
+        const across = uv.getX(i) * 2 - 1;
+        const forward = angle ? Math.cos(across * angle) * row : row;
+        const side = angle ? Math.sin(across * angle) * row : across * width;
         const offsetX = aimX * forward + aimZ * side;
         const offsetZ = aimZ * forward - aimX * side;
         positions.setXYZ(i, offsetX, world.heightAt(x + offsetX, z + offsetZ) - ground, offsetZ);

@@ -1,4 +1,5 @@
 import { mountAdventureMenu } from './adventure-menu.js';
+import { classAbilities } from './adventurer-pages.js';
 
 const OBJECTIVES = {
   trail: 'Folge den Laternen bis zum Tor.',
@@ -14,11 +15,14 @@ export function createHud(callbacks = {}) {
   const menu = mountAdventureMenu(byId, callbacks);
   const region = byId('region');
   const objective = byId('objective');
+  const tutorialStep = byId('tutorial-step');
   const interact = byId('interact');
   const performance = byId('performance');
   const spell = byId('spell');
   const seal = byId('break-seal');
   const arc = byId('thorn-lance');
+  const classesButton = byId('classes-button');
+  const abilityControls = [[spell, byId('spell-label')], [arc, byId('arc-label')], [seal, byId('seal-label')]];
   const boss = byId('boss');
   const bossName = byId('boss-name');
   const bossHealth = byId('boss-health');
@@ -48,12 +52,31 @@ export function createHud(callbacks = {}) {
     if (node.textContent !== value) node.textContent = value;
   }
 
+  function updateAbility([button, label], ability) {
+    if (!ability) return;
+    const name = typeof ability === 'string' ? ability : ability.name;
+    setText(label, ability.label ?? name);
+    button.setAttribute('aria-label', name);
+    button.title = ability.description ? name + ' · ' + ability.description : name;
+  }
+
   return {
     isOpen: menu.isOpen,
+    openPage: menu.openPage,
     handleActions: menu.handleActions,
     chat: menu.chat,
-    onlineStatus: menu.onlineStatus,
-    onlineCount: menu.onlineCount,
+    professions: menu.professions,
+    travel: menu.travel,
+    classes(state) {
+      const { selected, choices = [] } = state;
+      const current = choices.find(item => item.id === selected);
+      classesButton.hidden = choices.length === 0;
+      setText(classesButton, current?.name ?? 'Klasse wählen');
+      classesButton.setAttribute('aria-label', current ? 'Klasse · ' + current.name : 'Klasse wählen');
+      const abilities = classAbilities(current);
+      for (const [index, control] of abilityControls.entries()) updateAbility(control, abilities[index]);
+      menu.classes(state);
+    },
     progress(state) {
       const { level: playerLevel, xp, nextXp, points } = state;
       setText(level, 'Stufe ' + playerLevel);
@@ -92,6 +115,9 @@ export function createHud(callbacks = {}) {
       }
       setText(region, state.region);
       setText(objective, state.objectiveText ?? OBJECTIVES[state.objective] ?? '');
+      const tutorialLabel = state.tutorial?.label ?? '';
+      tutorialStep.hidden = !tutorialLabel;
+      setText(tutorialStep, tutorialLabel);
       setText(interact, state.interaction);
       interact.hidden = !state.interaction;
       showCooldown(spell, state.cooldown);

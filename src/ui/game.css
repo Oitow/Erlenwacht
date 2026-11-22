@@ -35,9 +35,6 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .game-header { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
 .hud-nav { display: flex; flex-wrap: wrap; justify-content: end; gap: 5px; }
 .hud-nav button { min-height: 44px; }
-#online-button { color: var(--muted); white-space: nowrap; }
-#online-button[data-state="connected"] { color: #e6f8cf; border-color: #a8c78a; background: #2e482e; }
-#online-button[data-state="connecting"], #online-button[data-state="reconnecting"] { color: var(--accent); }
 .objective {
   width: fit-content;
   max-width: 355px;
@@ -51,6 +48,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   margin: 0;
 }
 .objective p { margin: 3px 0 0; font-size: .84rem; }
+#tutorial-step { color: var(--accent); font-size: .74rem; font-weight: 650; }
 #bag { white-space: nowrap; }
 #bag-count { color: var(--accent); font-variant-numeric: tabular-nums; }
 #chat-unread {
@@ -72,6 +70,17 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   border-radius: 5px;
 }
 .health-label { display: flex; justify-content: space-between; gap: 7px; font-size: .78rem; }
+#classes-button {
+  width: 100%;
+  min-height: 36px;
+  margin-bottom: 5px;
+  padding: 2px 5px;
+  border-color: #756c5188;
+  border-radius: 4px;
+  color: var(--accent);
+  font-size: .84rem;
+  text-align: left;
+}
 #health { width: 100%; height: 11px; vertical-align: middle; accent-color: #ce7362; }
 #health::-webkit-meter-bar { background: #3a2828; border: 0; height: 6px; }
 #health::-webkit-meter-optimum-value,
@@ -161,6 +170,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   background: linear-gradient(to top, #21383e var(--cooldown, 0%), #1a4352 var(--cooldown, 0%));
 }
 #spell span { display: block; }
+.ability-label { hyphens: auto; overflow-wrap: anywhere; }
 #performance { justify-self: end; margin-top: 1px; font-size: .68rem; color: #e1ded1; text-shadow: 0 1px 4px #000; }
 #boot {
   position: absolute;
@@ -214,6 +224,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   width: min(92vw, 520px);
   max-height: min(85dvh, 680px);
   padding: 0;
+  overflow: hidden;
   color: inherit;
   background: #141d20;
   border: 1px solid var(--border);
@@ -221,19 +232,25 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   box-shadow: 0 14px 54px #0009;
 }
 #adventure-menu::backdrop { background: #080c0dbe; }
-.menu-sheet { padding: clamp(12px, 4vw, 22px); }
+.menu-sheet {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  max-height: min(85dvh - 2px, 678px);
+  padding: clamp(12px, 4vw, 22px);
+}
+.menu-sheet > section { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .menu-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .menu-header h2 { margin: 0; font: 600 1.55rem/1.15 Georgia, serif; color: var(--accent); }
 #menu-close { min-width: 44px; padding: 0; font-size: 1.4rem; }
 .menu-nav {
   display: grid;
-  grid-template-columns: 1fr 1.2fr .8fr .7fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin: 12px 0 15px;
   padding-bottom: 12px;
   border-bottom: 1px solid #756c5166;
 }
-.menu-nav button { min-width: 0; padding-inline: 5px; font-size: .89rem; overflow-wrap: anywhere; }
+.menu-nav button { min-height: 44px; min-width: 0; padding-inline: 5px; font-size: .88rem; }
 .menu-nav button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: #423625; }
 .menu-commands { display: flex; flex-wrap: wrap; gap: 7px; }
 .menu-sheet h3 { margin: 16px 0 5px; font-size: 1rem; }
@@ -241,10 +258,12 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .control-guide div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .control-guide dd { margin: 0; color: var(--muted); }
 #progress-summary { color: var(--accent); margin: 0 0 8px; }
-#skill-feedback { color: #c8dfaf; margin: 0 0 8px; }
-#skill-feedback:empty { display: none; }
+#skill-feedback, .menu-feedback { color: #c8dfaf; margin: 0 0 8px; }
+#skill-feedback:empty, .menu-feedback:empty { display: none; }
+.menu-sheet .menu-section-title { margin: 0 0 3px; color: var(--accent); font: 600 1.2rem/1.2 Georgia, serif; }
+.menu-summary { margin: 0 0 10px; color: var(--muted); }
 .skills-list { display: grid; gap: 7px; list-style: none; margin: 0; padding: 0; }
-.skills-list li {
+.skills-list > li {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -254,36 +273,29 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   border-radius: 5px;
   background: #1c282c;
 }
+.skills-list > .active-choice { border-color: #8eae79; background: #26332a; }
 .skills-list h3 { margin: 0 0 3px; }
 .skills-list p { margin: 0; color: var(--muted); font-size: .86rem; }
-.skills-list button { flex: none; white-space: nowrap; padding-inline: 8px; }
+.skills-list button { flex: none; min-height: 44px; white-space: nowrap; padding-inline: 8px; }
 .skills-list button:disabled { color: var(--muted); border-color: #756c5166; cursor: default; }
-#online-title, #chat-mode { margin-top: 0; }
-#online-status {
+.choice-details { min-width: 0; }
+.choice-details h4 { margin: 0 0 3px; font-size: .97rem; }
+.choice-details .class-ability, .choice-details .recipe-rank { margin-top: 5px; font-size: .8rem; }
+.class-ability kbd { color: var(--accent); font: inherit; font-weight: 650; }
+.profession-ranks, .recipe-costs { list-style: none; padding: 0; }
+.profession-ranks { display: grid; gap: 6px; margin: 0 0 10px; }
+.profession-ranks li {
   display: grid;
-  gap: 2px;
-  padding: 8px 10px;
-  border: 1px solid #756c5166;
-  border-left: 3px solid var(--border);
-  border-radius: 5px;
-  background: #101719;
-  overflow-wrap: anywhere;
+  grid-template-columns: 1fr auto;
+  gap: 4px 7px;
+  padding: 5px 7px;
+  border-left: 2px solid #756c5188;
+  background: #1c282c;
+  font-size: .8rem;
 }
-#online-status[data-state="connected"] { border-left-color: #a8c78a; }
-#online-status[data-state="error"] { border-left-color: #e49382; }
-#online-status[data-state="connecting"], #online-status[data-state="reconnecting"] { border-left-color: var(--accent); }
-#online-status-message, #online-peers { color: var(--muted); font-size: .87rem; }
-#online-peers { margin: 6px 0 0; }
-#online-settings { min-width: 0; margin: 11px 0 12px; padding: 0; border: 0; }
-.online-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-#online-form label { display: grid; gap: 4px; min-width: 0; font-size: .87rem; }
-#online-form input { width: 100%; }
-#online-form fieldset:disabled { color: var(--muted); }
-#online-form input:disabled { opacity: .7; }
-#online-advanced { margin-top: 9px; }
-#online-advanced summary { width: fit-content; padding: 7px 0; color: var(--accent); cursor: pointer; }
-#online-address-hint { margin: 4px 0 0; color: var(--muted); font-size: .79rem; }
-#online-connect { color: var(--accent); border-color: var(--accent); }
+.profession-ranks progress { grid-column: 1 / -1; width: 100%; height: 6px; accent-color: var(--accent); }
+.recipe-costs { display: flex; flex-wrap: wrap; gap: 3px 8px; margin: 4px 0 0; color: #c8dfaf; font-size: .8rem; }
+.recipe-costs .missing { color: #f0b7aa; }
 #chat-log {
   min-height: 80px;
   max-height: min(34dvh, 260px);
@@ -300,11 +312,11 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 #chat-lines strong { color: var(--accent); font-size: .8rem; }
 #chat-lines li[data-channel="npc"] strong { color: #b9d9b3; }
 #chat-lines li[data-channel="local"] strong { color: #c7e7f0; }
-#chat-lines li[data-channel="room"] strong { color: #83d5d1; }
 #chat-form { margin-top: 12px; }
 #chat-form label { display: block; margin-bottom: 4px; color: var(--muted); }
 .chat-compose { display: flex; gap: 6px; }
-#chat-message, #online-form input {
+#chat-message {
+  flex: 1;
   min-width: 0;
   min-height: 42px;
   padding: 6px 9px;
@@ -315,20 +327,17 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   font: inherit;
   font-size: 16px;
 }
-#chat-message { flex: 1; }
-#chat-message:focus-visible, #chat-log:focus-visible, #online-form input:focus-visible, #online-advanced summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#chat-message:focus-visible, #chat-log:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 @media (pointer: coarse), (max-width: 620px) {
   .game-header { flex-direction: column-reverse; }
   .hud-nav { width: 100%; }
   .objective { max-width: min(100%, 355px); }
-  .actions { display: grid; grid-template-columns: repeat(3, minmax(44px, 1fr)); align-items: stretch; }
+  .actions { display: grid; grid-template-columns: repeat(3, minmax(44px, 1fr)); align-items: stretch; width: min(58vw, 224px); }
   .actions button { min-height: 44px; padding-inline: 7px; }
   #spell { grid-column: 3; grid-row: 1 / span 2; }
   #break-seal, #thorn-lance { min-height: 44px; }
   #adventure-menu { max-height: min(82dvh, 680px); }
-}
-@media (max-width: 390px) {
-  .hud-nav button { padding-inline: 8px; }
+  .menu-sheet { max-height: min(82dvh - 2px, 678px); }
 }
 @media (max-width: 330px) {
   .actions { gap: 4px; }

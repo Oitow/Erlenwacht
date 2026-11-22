@@ -1,8 +1,17 @@
 # Erlenwacht
 
-Erlenwacht ist ein mobiles Dark-Fantasy-RPG im Browser. Im Dammerwald lernst du den Runenstoß und sammelst deine erste Beute. Den Laternen folgend erreichst du die Enklave und den Auftrag gegen den Reliktwächter. Über das Nordtor führt die nächste Expedition ins Schwarze Moor, in den Mondbruch und bis zur Krähenwarte. Der Zielpfeil zeigt die Richtung relativ zur Kamera.
+Erlenwacht ist ein mobiles Dark-Fantasy-RPG im Browser. Du startest im Glutlager am Aschenpass. Wähle eine Klasse, sammle einen Rohstoff und stelle an der Werkbank einen ersten Gegenstand her. Wege führen über die Schilfsenke und den Falkenkamm zum Wegfeuer. Der Hauptpfad führt weiter in den Dammerwald, zur Enklave und in die Nordmark mit Moor, Mondbruch und Krähenwarte.
 
-Gegner und Aufträge gewähren Erfahrung. Auf Stufe 2 lernst du die Dornlanze. Pro Stufenaufstieg erhältst du einen Punkt, mit dem du im Fähigkeitenmenü einen verfügbaren Zauber bis Rang 3 steigern kannst. Siegelbruch unterbricht vorbereitete Angriffe und öffnet den Schild des Reliktwächters. Im lokalen Chat zeigen `/hilfe`, `/quest`, `/ort` und `/wache` Spielhinweise an.
+| Klasse | Primär | Zweite Fähigkeit |
+| --- | --- | --- |
+| Bastion | Schildhieb | Eisenwacht |
+| Waldläufer | Schnellschuss | Fächerschuss |
+| Runenweber | Runenstoß | Glutkreis |
+| Dornhüter | Dornenwelle | Dornlanze |
+
+Im Glutlager und bei der Torwache kannst du die Klasse wechseln. Fähigkeitenpunkte steigen mit der Charakterstufe und bleiben beim Klassenwechsel in den zugehörigen Fähigkeitenplätzen. Siegelbruch lernst du über den Auftrag gegen den Reliktwächter.
+
+Holzhandwerk, Kräuterkunde und Schmiedekunst haben eigene Ränge. Sammeln und Herstellen geben Berufs-EP. Vorkommen wachsen nach und weiterführende Rezepte kosten auch Materialien aus dem Kampf. Entdeckte Wegfeuer verbinden Glutlager, Aschenpass, Enklave und Wachtstein. Über das Reisemenü kannst du zwischen diesen Rastpunkten reisen, solange du an einem Wegfeuer stehst.
 
 ## Starten
 
@@ -14,21 +23,6 @@ python3 -m http.server 8000
 
 Öffne anschließend http://localhost:8000. Der Browser benötigt WebGL 2 und eine Internetverbindung für die fest versionierte Three.js-Abhängigkeit.
 
-## Zusammen spielen
-
-Für einen Testraum startest du Erlenwacht mit Node.js 22 oder neuer aus dem Repository:
-
-```sh
-npm ci
-npm start
-```
-
-Öffne die vom Server angezeigte URL in zwei Browserprofilen oder auf zwei Geräten. Wähle im Menü **Online**, gib je einen Namen und in beiden Fenstern denselben Raumcode ein. Starte den Versuch mit zwei frischen Spielständen oder am selben Rastpunkt, damit sich die Figuren in Sichtweite befinden. Im **Chat** gehen normale Nachrichten an den Raum. Befehle wie `/quest` funktionieren weiterhin lokal.
-
-Ein Raum synchronisiert sichtbare Figuren, Bewegung und Chat. Gegner, Loot, Aufträge und Charakterfortschritt laufen pro Spieler und werden lokal gespeichert. Räume sind kurzlebig und nutzen Gastnamen.
-
-GitHub Pages bietet den Solo-Modus. Der Online-Modus braucht einen erreichbaren WebSocket-Server. Für den Test im lokalen Netz startest du den Server unter Linux mit `HOST=0.0.0.0 npm start` oder in PowerShell mit `$env:HOST="0.0.0.0"; npm start`. Öffne auf dem Handy `http://<LAN-IP-des-Rechners>:8080`. Für eine HTTPS-Seite trägst du im Online-Menü die `wss://`-Adresse ein. Gib dem Server bei getrenntem Frontend und Backend die erlaubte Seiten-Origin über `ERLENWACHT_ORIGINS` mit.
-
 ## Steuerung
 
 | Aktion | Tastatur und Maus | Touch |
@@ -36,19 +30,19 @@ GitHub Pages bietet den Solo-Modus. Der Online-Modus braucht einen erreichbaren 
 | Laufen | WASD oder Pfeiltasten | Linker Stick |
 | Sprinten | Umschalt gedrückt halten | — |
 | Kamera drehen | Im Spielbild ziehen | Auf dem Spielbild ziehen |
-| Runenstoß | Leertaste | Rune |
-| Dornlanze | C | Lanze (ab Stufe 2) |
+| Primäre Klassenfähigkeit | Leertaste | Beschriftete Fähigkeit |
+| Zweite Klassenfähigkeit | C | Beschriftete Fähigkeit |
 | Siegelbruch | F | Siegelbruch (ab dem Auftrag) |
 | Auto-Zauber | R | Auto |
 | Springen | Q | Sprung |
-| Aufheben oder sprechen | E | Eingeblendete Aktion |
+| Aufheben, sammeln, sprechen oder Wegfeuer benutzen | E | Eingeblendete Aktion |
 | Beutel | I | Beutel |
 | Menü | M | Menü |
 | Fähigkeiten | K | Fähigkeiten im Menü |
 | Lokaler Chat | Eingabetaste | Chat |
 
-Am Tor und später am Wachtstein werden Rastpunkte gespeichert. Beute, Ausrüstung, Stufe, vergebene Fähigkeitspunkte und Auftragsfortschritt bleiben beim Neuladen im selben Browser erhalten. Beim Tod kehrst du mit vollem Leben zum letzten Rastpunkt zurück.
+Klasse, Berufsränge, Beute, Ausrüstung, Stufe, Fähigkeiten, Wegfeuer und Aufträge bleiben beim Neuladen im selben Browser erhalten. Beim Tod kehrst du mit vollem Leben zum letzten Rastpunkt zurück. Der lokale Chat bietet mit `/hilfe`, `/quest`, `/ort` und `/wache` Spielhinweise.
 
 ## Entwicklung
 
-Die [Architektur](docs/ARCHITECTURE.md) beschreibt die Modulgrenzen. Der Erlenwacht-Prototyp hat einen eigenständigen Einstieg. Die ursprüngliche [Enklave in PAG](https://github.com/Oitow/pag/tree/main/games/enklave) bleibt ein separates Projekt.
+Die [Architektur](docs/ARCHITECTURE.md) beschreibt die Modulgrenzen. Diese Version ist auf Einzelspieler ausgerichtet. Der bisherige Online-Stand bleibt im [GitHub-Verlauf](https://github.com/Oitow/Erlenwacht/pull/12) verfügbar.
