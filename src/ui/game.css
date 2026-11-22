@@ -236,6 +236,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .menu-nav button { min-width: 0; padding-inline: 5px; font-size: .89rem; overflow-wrap: anywhere; }
 .menu-nav button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: #423625; }
 .menu-commands { display: flex; flex-wrap: wrap; gap: 7px; }
+.menu-lab { align-self: center; padding: 0 7px; color: inherit; text-underline-offset: .2em; }
 .menu-sheet h3 { margin: 16px 0 5px; font-size: 1rem; }
 .control-guide { display: grid; gap: 6px; margin: 5px 0 2px; }
 .control-guide div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

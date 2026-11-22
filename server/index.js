@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { attachRooms } from './rooms.js';
 
 const ROOT = new URL('../', import.meta.url);
-const SOURCE_PATH = /^\/src\/(?:[\w-]+\/)*[\w-]+\.(js|css)$/;
+const SOURCE_PATH = /^\/(?:src\/(?:[\w-]+\/)*|world\/)[\w-]+\.(js|css)$/;
 const MIME = { js: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8' };
 
 function respond(request, response, status, type, body) {
@@ -30,16 +30,22 @@ async function serve(request, response) {
     respond(request, response, 200, 'application/json; charset=utf-8', '{"status":"ok"}');
     return;
   }
-  const isIndex = path === '/' || path === '/index.html';
+  const index = path === '/' || path === '/index.html' ? 'index.html'
+    : path === '/world/' || path === '/world/index.html' ? 'world/index.html' : null;
+  if (path === '/world') {
+    response.setHeader('Location', '/world/' + request.url.slice('/world'.length));
+    respond(request, response, 308, plain, 'Redirecting to World Lab\n');
+    return;
+  }
   const match = SOURCE_PATH.exec(path);
-  if (!isIndex && !match) {
+  if (!index && !match) {
     respond(request, response, 404, plain, 'Not found\n');
     return;
   }
 
   let body;
   try {
-    body = await readFile(new URL(isIndex ? 'index.html' : path.slice(1), ROOT));
+    body = await readFile(new URL(index ?? path.slice(1), ROOT));
   } catch (error) {
     if (error.code === 'ENOENT' || error.code === 'ENOTDIR') {
       respond(request, response, 404, plain, 'Not found\n');
@@ -48,7 +54,7 @@ async function serve(request, response) {
     }
     return;
   }
-  respond(request, response, 200, isIndex ? 'text/html; charset=utf-8' : MIME[match[1]], body);
+  respond(request, response, 200, index ? 'text/html; charset=utf-8' : MIME[match[1]], body);
 }
 
 function normalizeOrigins(origins) {

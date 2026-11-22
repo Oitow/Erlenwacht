@@ -14,6 +14,12 @@ python3 -m http.server 8000
 
 Öffne anschließend http://localhost:8000. Der Browser benötigt WebGL 2 und eine Internetverbindung für die fest versionierte Three.js-Abhängigkeit.
 
+## World Lab
+
+Öffne **Menü → World Lab** oder direkt [world/](world/). Das Solo-Labor lädt eine 8,192 × 8,192 km große, durch einen Seed reproduzierbare Welt mit sechs Biomen und zehn Reisezielen. Beginne an der Laternenrast, sammle Holz und Steine und setze im Beutel ein Wegfeuer. Die Karte kann ein Ziel markieren oder es direkt für einen Testbesuch laden.
+
+Im **Labor** findest du drei Grafikprofile, Licht, Wetter, Hirschritt, Freiflug, Seed-Wechsel, Leistungsdaten und die 3D-Asset-Vorschau. Fortschritt und Wegfeuer werden für jeden Seed lokal gespeichert. Mehr zu Bedienung und Aufbau steht in der [World-Lab-Dokumentation](world/README.md).
+
 ## Zusammen spielen
 
 Für einen Testraum startest du Erlenwacht mit Node.js 22 oder neuer aus dem Repository:
