@@ -45,5 +45,12 @@ export function createCamera(camera, world) {
     update(Infinity, position);
   }
 
-  return { orientMovement, update, reset };
+  return {
+    orientMovement,
+    update,
+    reset,
+    bearingTo(x, z) {
+      return Math.atan2(x, -z) + yaw;
+    },
+  };
 }

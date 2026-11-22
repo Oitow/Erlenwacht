@@ -1,6 +1,6 @@
 # Erlenwacht
 
-Erlenwacht ist ein mobiles Dark-Fantasy-RPG im Browser. Der Dammerwald führt über alte Ruinen zu einer begehbaren Enklave. Folge den Laternen, bekämpfe Schattenwesen und sprich mit der Torwache im Innenhof.
+Erlenwacht ist ein mobiles Dark-Fantasy-RPG im Browser. Der Dammerwald führt über alte Ruinen zu einer begehbaren Enklave. Folge den Laternen, bekämpfe Schattenwesen und sprich mit der Torwache im Innenhof. Nach der Ankunft kannst du dort den Auftrag gegen den Reliktwächter annehmen. Siegelbruch öffnet seinen Schild für kurze Zeit und unterbricht gerade vorbereitete Angriffe. Der Zielpfeil zeigt die Richtung relativ zur Kamera.
 
 ## Starten
 
@@ -20,6 +20,7 @@ python3 -m http.server 8000
 | Sprinten | Umschalt gedrückt halten | — |
 | Kamera drehen | Im Spielbild ziehen | Auf dem Spielbild ziehen |
 | Runenstoß | Leertaste | Rune |
+| Siegelbruch | F | Siegelbruch (ab dem Auftrag) |
 | Auto-Zauber | R | Auto |
 | Springen | Q | Sprung |
 | Aufheben oder sprechen | E | Eingeblendete Aktion |

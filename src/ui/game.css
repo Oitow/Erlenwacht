@@ -137,3 +137,29 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   .game-footer { left: 9px; right: 9px; }
   .actions button { padding-inline: 5px; }
 }
+#waypoint { color: var(--accent); font-variant-numeric: tabular-nums; }
+#waypoint-arrow { display: inline-block; width: 1em; text-align: center; }
+#boss {
+  width: min(100%, 350px);
+  margin: 12px auto 0;
+  padding: 6px 9px;
+  border: 1px solid #af8ccb;
+  border-radius: 5px;
+  background: var(--panel);
+  color: #ead6ff;
+}
+#boss-health { display: block; width: 100%; height: 10px; accent-color: #a95cd7; }
+#boss-health::-webkit-meter-optimum-value { background: #a95cd7; }
+#break-seal {
+  min-height: 53px;
+  color: #ffdf9c;
+  border-color: #a87c4b;
+  background: linear-gradient(to top, #352a2a var(--cooldown, 0%), #513f2c var(--cooldown, 0%));
+  line-height: 1.05;
+}
+@media (max-width: 330px) {
+  .actions { gap: 4px; }
+  #stick { width: 88px; height: 88px; flex-basis: 88px; }
+  #nub { top: 24px; left: 24px; }
+  #spell { min-width: 50px; }
+}

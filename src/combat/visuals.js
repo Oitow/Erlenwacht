@@ -75,10 +75,13 @@ export function createGroundEffect(group, world, tint, burst = false) {
 export function createEnemyModels() {
   const body = new THREE.IcosahedronGeometry(1, 0);
   const hood = new THREE.DodecahedronGeometry(1, 0);
+  const halo = new THREE.TorusGeometry(1.13, 0.045, 5, 24);
   const spike = new THREE.ConeGeometry(1, 1, 4);
   const materials = {
     hunter: new THREE.MeshStandardMaterial({ color: 0x332633, roughness: 0.87 }),
     sentinel: new THREE.MeshStandardMaterial({ color: 0x252d3d, roughness: 0.85 }),
+    warden: new THREE.MeshStandardMaterial({ color: 0x58485d, roughness: 0.66 }),
+    ward: new THREE.MeshBasicMaterial({ color: 0xd7a2ff }),
     edge: new THREE.MeshStandardMaterial({ color: 0x545448, roughness: 0.69 }),
     eyes: new THREE.MeshBasicMaterial({ color: 0xff9c63 }),
     flash: new THREE.MeshBasicMaterial({ color: 0xdaefff }),
@@ -96,7 +99,8 @@ export function createEnemyModels() {
     const silhouette = new THREE.Group();
     group.add(silhouette);
     const surface = materials[archetype];
-    const isSentinel = archetype === 'sentinel';
+    const isWarden = archetype === 'warden';
+    const isSentinel = archetype !== 'hunter';
     const torso = part(silhouette, body, surface, [0, isSentinel ? 1.04 : 0.64, 0], isSentinel ? [0.82, 1.23, 0.61] : [0.76, 0.68, 1.01]);
     const head = part(silhouette, hood, surface, [0, isSentinel ? 1.91 : 0.68, isSentinel ? 0.14 : 0.73], isSentinel ? [0.5, 0.55, 0.49] : [0.5, 0.48, 0.55]);
 
@@ -106,11 +110,18 @@ export function createEnemyModels() {
       part(silhouette, body, materials.eyes, [side * 0.21, isSentinel ? 1.95 : 0.73, isSentinel ? 0.55 : 1.22], [0.11, 0.075, 0.08]);
     }
 
+    const barrier = isWarden ? part(silhouette, halo, materials.ward, [0, 1.12, 0], [1, 1, 1]) : null;
+    if (isWarden) silhouette.scale.setScalar(1.55);
+
     return {
-      animate(phase, bob, windup, flash) {
+      animate(phase, bob, windup, flash, warded) {
         silhouette.position.y = 0.04 + Math.sin(phase) * bob;
         silhouette.rotation.x = -windup * 0.14;
         torso.material = head.material = flash ? materials.flash : surface;
+        if (barrier) {
+          barrier.visible = warded;
+          barrier.rotation.set(Math.PI / 2 + Math.sin(phase * 0.4) * 0.27, phase * 0.13, 0);
+        }
       },
     };
   };

@@ -38,6 +38,16 @@ export const ITEMS = Object.freeze({
     glyph: '✦',
     spellPower: 1,
   }),
+  'seal-blade': Object.freeze({
+    id: 'seal-blade',
+    name: 'Siegelklinge',
+    description: '+2 Schaden für den Runenstoß.',
+    kind: 'equipment',
+    equipmentSlot: 'weapon',
+    maxStack: 1,
+    glyph: '✦',
+    spellPower: 2,
+  }),
 });
 
 function getItem(id) {

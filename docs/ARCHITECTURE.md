@@ -9,7 +9,7 @@
 | `src/engine` | 60 Hz simulation, rendering and adaptive pixel ratio | Supply game update and render callbacks |
 | `src/world` | Seeded scenery, terrain, collision, paths and encounter anchors | Add terrain and scenery builders or new encounter layouts |
 | `src/character` | Motion, avatar with procedural animation, orbit camera and device input | Add actions to the input adapter and motion states to the character |
-| `src/combat` | Encounter behavior, target rules, rune cooldown and defeat events | Add archetypes or introduce additional skills alongside Rune Burst |
+| `src/combat` | Encounter behavior, target rules, rune cooldown and defeat events | Add archetypes or introduce skills in `src/combat/skills.js` |
 | `src/inventory` | Item definitions, capacity, stacks, equipment and bag dialog | Add item definitions and equipment effects |
 | `src/game` | Session orchestration, quest, checkpoint, loot and save | Extend the quest flow or supply another persistence adapter |
 | `src/ui` | Health, objective, performance and interaction feedback | Render state supplied by the session |
@@ -22,7 +22,7 @@ Scenery uses instanced, spatially grouped meshes. Two lights are reused for near
 
 ## Persistence
 
-Save format v1 writes a single localStorage snapshot for quest progress, bag contents, equipped item, auto-cast preference, defeated encounter IDs, and uncollected world drops. The quest determines the spawn or enclave checkpoint on reload. Health and camera orientation reset there. Encounter IDs are currently array indexes. Append new anchors or migrate the save format before reordering existing anchors.
+Save format v1 writes a single localStorage snapshot for quest and warden contract progress, bag contents, equipped item, auto-cast preference, defeated encounter IDs, and uncollected world drops. The quest determines the spawn or enclave checkpoint on reload. Health and camera orientation reset there. Original encounter IDs retain their numeric indexes. New encounters can use explicit IDs that survive reordering. Preserve the original indexes or migrate the save format before reordering those entries. Existing v1 saves that reached the Enclave can accept the warden contract from the guard.
 
 This is a client-side simulation suited to a static host. Shared worlds will require server-owned state for movement validation, combat, loot and inventory. Keep renderer and input separate when replacing the local session authority.
 
