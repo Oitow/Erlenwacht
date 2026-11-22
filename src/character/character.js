@@ -79,20 +79,8 @@ export function createCharacter(scene, world) {
     avatar.animate(dt, movedSpeed, jumpHeight === 0, verticalVelocity, turned / dt);
   }
 
-  function getNetworkPose(pose = {}) {
-    const yaw = avatar.root.rotation.y;
-    pose.x = position.x;
-    pose.y = position.y;
-    pose.z = position.z;
-    pose.yaw = Math.atan2(Math.sin(yaw), Math.cos(yaw));
-    pose.speed = Math.hypot(velocity.x, velocity.z);
-    pose.grounded = jumpHeight === 0;
-    return pose;
-  }
-
   reset();
   return {
-    getNetworkPose,
     position,
     update,
     reset,

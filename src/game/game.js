@@ -8,8 +8,6 @@ import { createCombat } from '../combat/combat.js';
 import { createInventory, INVENTORY_CAPACITY, ITEMS } from '../inventory/inventory.js';
 import { mountInventory } from '../inventory/view.js';
 import { createHud } from '../ui/hud.js';
-import { createOnlineClient } from '../online/client.js';
-import { createPeerView } from '../online/peers.js';
 import { createLoot } from './loot.js';
 import { createWardenContract } from './warden-contract.js';
 import { createProgression } from './progression.js';
@@ -66,8 +64,6 @@ export function startGame({ onError }) {
   let saveAvailable = true;
   let damageMultiplier = 1;
   let healthBonus = 0;
-  let onlineState = 'idle';
-  const networkPose = {};
 
   const hud = createHud({
     onOpenChange: () => input.clear(),
@@ -82,26 +78,6 @@ export function startGame({ onError }) {
     onChat: sendChat,
     onBag: () => bag.toggle(),
     onToggleAuto: toggleAuto,
-    onConnect: options => online.connect(options),
-    onDisconnect: () => online.disconnect(),
-  });
-  const peers = createPeerView(render.scene, world);
-  const online = createOnlineClient({
-    onStatus(status) {
-      onlineState = status.state;
-      if (status.state !== 'connected') {
-        peers.clear();
-        hud.onlineCount(0);
-      }
-      hud.onlineStatus(status);
-    },
-    onSnapshot({ count, players }) {
-      peers.applySnapshot(players);
-      hud.onlineCount(Math.max(0, count - 1));
-    },
-    onChat({ name, text, self }) {
-      hud.chat(self ? 'Du' : name, text, 'room');
-    },
   });
 
   function flushSave() {
@@ -300,20 +276,11 @@ export function startGame({ onError }) {
 
   function sendChat(text) {
     const message = text.trim();
-    if (!message) return false;
-    if (!message.startsWith('/') && online.connected) {
-      if (online.chat(message)) return true;
-      hud.chat('System', 'Die Nachricht wurde nicht gesendet. Versuche es erneut.');
-      return false;
-    }
-    if (!message.startsWith('/') && (onlineState === 'connecting' || onlineState === 'reconnecting')) {
-      hud.chat('System', 'Warte auf die Verbindung, um im Raum zu schreiben.');
-      return false;
-    }
+    if (!message) return;
     hud.chat('Du', message, 'local');
     switch (message.toLowerCase()) {
       case '/hilfe':
-        hud.chat('System', '/quest · aktives Ziel | /ort · Gebiet | /wache · Hinweis der Torwache');
+        hud.chat('System', '/quest · aktives Ziel | /ort · aktuelles Gebiet | /wache · Hinweis der Torwache');
         break;
       case '/quest':
         hud.chat('System', currentObjective()[0]);
@@ -328,10 +295,9 @@ export function startGame({ onError }) {
         if (message.startsWith('/')) hud.chat('System', 'Unbekannter Befehl. Zeige mit /hilfe die Befehle an.');
         break;
     }
-    return true;
   }
 
-  function updateAdventure(dt) {
+  function update(dt) {
     const actions = input.sample();
     if (hp === 0) {
       flushSave();
@@ -417,18 +383,11 @@ export function startGame({ onError }) {
   dirty = false;
   hud.auto(auto);
   updateProgression();
-  hud.chat('System', 'Tippe /hilfe für Spielbefehle. Einen Raum findest du im Menü unter Online.');
+  hud.chat('System', 'Erlenwacht · Lokaler Chat. Tippe /hilfe für die Befehle.');
   respawn();
 
   startLoop({
-    update(dt) {
-      updateAdventure(dt);
-      if (online.connected) {
-        online.update(dt, character.getNetworkPose(networkPose));
-        peers.update(dt, position);
-      }
-    },
-    render: render.render, onError,
+    update, render: render.render, onError,
     performanceSample(fps) {
       render.adapt(fps);
       hud.performance(fps);

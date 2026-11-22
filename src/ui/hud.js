@@ -52,8 +52,6 @@ export function createHud(callbacks = {}) {
     isOpen: menu.isOpen,
     handleActions: menu.handleActions,
     chat: menu.chat,
-    onlineStatus: menu.onlineStatus,
-    onlineCount: menu.onlineCount,
     progress(state) {
       const { level: playerLevel, xp, nextXp, points } = state;
       setText(level, 'Stufe ' + playerLevel);

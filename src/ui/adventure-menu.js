@@ -1,7 +1,5 @@
-import { mountOnlineRoom } from './online-room.js';
-
 const CHAT_LIMIT = 48;
-const SECTIONS = ['menu', 'skills', 'online', 'chat'];
+const SECTIONS = ['menu', 'skills', 'chat'];
 
 export function mountAdventureMenu(byId, callbacks) {
   const dialog = byId('adventure-menu');
@@ -13,34 +11,20 @@ export function mountAdventureMenu(byId, callbacks) {
   const unreadBadge = byId('chat-unread');
   const chatLog = byId('chat-log');
   const chatLines = byId('chat-lines');
-  const chatEmpty = byId('chat-empty');
-  const chatMode = byId('chat-mode');
   const chatForm = byId('chat-form');
   const chatMessage = byId('chat-message');
-  const chatMessageLabel = byId('chat-message-label');
   const tabs = new Map(SECTIONS.map(id => [id, {
     section: byId(id + '-page'),
     button: byId(id + '-page-button'),
   }]));
   let page = 'menu';
+  let unread = 0;
   let progression = { level: 1, xp: 0, nextXp: 100, points: 0, skills: [] };
 
   function updateUnread() {
-    const unread = chatLines.querySelectorAll('[data-unread]').length;
     unreadBadge.hidden = unread === 0;
     unreadBadge.textContent = unread > 9 ? '9+' : String(unread);
   }
-
-  const online = mountOnlineRoom(byId, callbacks, (room, clearRoom, pending) => {
-    chatMode.textContent = pending ? 'Raumchat · Warte auf Verbindung'
-      : room ? 'Raumchat · ' + room : 'Lokaler Chat';
-    chatMessageLabel.textContent = room ? 'Nachricht an den Raum' : 'Lokale Nachricht';
-    if (clearRoom) {
-      for (const line of chatLines.querySelectorAll('[data-channel="room"]')) line.remove();
-      chatEmpty.hidden = chatLines.childElementCount > 0;
-      updateUnread();
-    }
-  });
 
   function scrollChat() {
     chatLog.scrollTop = chatLog.scrollHeight;
@@ -97,7 +81,7 @@ export function mountAdventureMenu(byId, callbacks) {
       renderSkills();
     }
     if (page === 'chat') {
-      for (const line of chatLines.querySelectorAll('[data-unread]')) delete line.dataset.unread;
+      unread = 0;
       updateUnread();
     }
   }
@@ -142,14 +126,13 @@ export function mountAdventureMenu(byId, callbacks) {
     event.preventDefault();
     const message = chatMessage.value.trim();
     if (!message) return;
-    if (callbacks.onChat?.(message) !== false) chatMessage.value = '';
+    callbacks.onChat?.(message);
+    chatMessage.value = '';
     chatMessage.focus({ preventScroll: true });
   });
 
   return {
     isOpen: () => dialog.open,
-    onlineStatus: online.status,
-    onlineCount: online.count,
     handleActions(actions) {
       const next = SECTIONS.find(id => actions[id]);
       if (!next) return false;
@@ -170,14 +153,16 @@ export function mountAdventureMenu(byId, callbacks) {
       const line = document.createElement('li');
       const speaker = document.createElement('strong');
       line.dataset.channel = channel;
-      if (!reading) line.dataset.unread = '';
       speaker.textContent = author;
       line.append(speaker, document.createTextNode(message));
-      chatEmpty.hidden = true;
+      byId('chat-empty').hidden = true;
       chatLines.append(line);
       if (chatLines.childElementCount > CHAT_LIMIT) chatLines.firstElementChild.remove();
       if (follow) scrollChat();
-      if (!reading) updateUnread();
+      if (!reading) {
+        unread = Math.min(10, unread + 1);
+        updateUnread();
+      }
     },
   };
 }
