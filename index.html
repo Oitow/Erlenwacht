@@ -20,21 +20,27 @@
         <section class="objective" aria-label="Gebiet und Aufgabe">
           <h1 id="region">Dammerwald</h1>
           <p id="objective">Folge dem Laternenpfad zur Enklave.</p>
-          <p id="waypoint" hidden><span id="waypoint-arrow" aria-hidden="true">↑</span> <span id="waypoint-range"></span></p>
+          <p id="waypoint" hidden><span id="waypoint-arrow" aria-hidden="true">↑</span> <span id="waypoint-destination" hidden></span> <span id="waypoint-range"></span></p>
         </section>
-        <button id="bag" type="button" aria-haspopup="dialog" aria-keyshortcuts="I">
-          <span aria-hidden="true">◇</span> Beutel <span id="bag-count"></span>
-        </button>
+        <nav class="hud-nav" aria-label="Spielmenü">
+          <button id="menu-button" type="button" aria-haspopup="dialog" aria-keyshortcuts="M">Menü</button>
+          <button id="chat-button" type="button" aria-haspopup="dialog" aria-keyshortcuts="Enter">Chat <span id="chat-unread" hidden></span></button>
+          <button id="bag" type="button" aria-haspopup="dialog" aria-keyshortcuts="I">Beutel <span id="bag-count"></span></button>
+        </nav>
       </header>
 
       <section class="vitals" aria-label="Charakterstatus">
         <div class="health-label"><span>Leben</span><span id="life">100 / 100</span></div>
         <meter id="health" min="0" max="100" low="30" optimum="100" value="100" aria-label="Leben"></meter>
+        <button id="skills-button" type="button" aria-haspopup="dialog" aria-keyshortcuts="K">
+          <span id="level">Stufe 1</span><span id="skill-points" hidden></span>
+        </button>
+        <progress id="experience" value="0" max="100" aria-label="Erfahrung zur nächsten Stufe"></progress>
       </section>
 
-      <section id="boss" aria-label="Reliktwächter" hidden>
+      <section id="boss" aria-labelledby="boss-name" hidden>
         <div class="health-label">
-          <span>Reliktwächter</span>
+          <span id="boss-name">Reliktwächter</span>
           <span id="boss-status"></span>
         </div>
         <meter id="boss-health" min="0" max="14" aria-label="Leben des Reliktwächters"></meter>
@@ -50,12 +56,58 @@
             <button id="auto" type="button" aria-pressed="false" aria-keyshortcuts="R">Auto</button>
             <button id="jump" type="button" aria-keyshortcuts="Q">Sprung</button>
             <button id="break-seal" type="button" aria-keyshortcuts="F" title="Schild brechen und Angriffe unterbrechen" hidden>Siegel<br>bruch</button>
+            <button id="thorn-lance" type="button" aria-keyshortcuts="C" title="Gegner auf einer Linie treffen und unterbrechen" hidden>Dorn<br>lanze</button>
             <button id="spell" type="button" aria-keyshortcuts="Space">✦ <span>Rune</span></button>
           </div>
         </div>
         <div id="performance" aria-label="Bildrate"></div>
       </div>
     </div>
+    <dialog id="adventure-menu" aria-labelledby="menu-title">
+      <div class="menu-sheet">
+        <header class="menu-header">
+          <h2 id="menu-title">Abenteuer</h2>
+          <button id="menu-close" type="button" aria-label="Menü schließen">×</button>
+        </header>
+        <nav class="menu-nav" aria-label="Menübereiche">
+          <button id="menu-page-button" type="button" aria-controls="menu-page" aria-pressed="true">Übersicht</button>
+          <button id="skills-page-button" type="button" aria-controls="skills-page" aria-pressed="false">Fähigkeiten</button>
+          <button id="chat-page-button" type="button" aria-controls="chat-page" aria-pressed="false">Chat</button>
+        </nav>
+        <section id="menu-page" aria-label="Übersicht">
+          <div class="menu-commands">
+            <button id="menu-bag" type="button">Beutel öffnen</button>
+            <button id="menu-auto" type="button" aria-pressed="false">Automatische Runen</button>
+          </div>
+          <h3>Steuerung</h3>
+          <dl class="control-guide">
+            <div><dt>Laufen und sprinten</dt><dd>WASD / Umschalt · Stick auf Touch</dd></div>
+            <div><dt>Kamera</dt><dd>Ziehen</dd></div>
+            <div><dt>Interagieren und springen</dt><dd>E / Q</dd></div>
+            <div><dt>Rune, Siegelbruch, Dornlanze</dt><dd>Leertaste / F / C</dd></div>
+            <div><dt>Beutel, Fähigkeiten, Chat</dt><dd>I / K / Eingabe</dd></div>
+          </dl>
+        </section>
+        <section id="skills-page" aria-label="Fähigkeiten" hidden>
+          <p id="progress-summary"></p>
+          <p id="skill-feedback" role="status"></p>
+          <ul id="skills-list" class="skills-list"></ul>
+        </section>
+        <section id="chat-page" aria-label="Lokaler Chat" hidden>
+          <div id="chat-log" role="log" aria-label="Nachrichten" tabindex="0">
+            <p id="chat-empty">Noch keine Nachrichten.</p>
+            <ul id="chat-lines"></ul>
+          </div>
+          <form id="chat-form" hidden>
+            <label for="chat-message">Lokale Nachricht</label>
+            <div class="chat-compose">
+              <input id="chat-message" name="message" type="text" maxlength="160" autocomplete="off" required>
+              <button type="submit">Senden</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </dialog>
     <dialog id="inventory" aria-labelledby="inventory-title"></dialog>
     <dialog id="defeat" aria-labelledby="defeat-title">
       <h2 id="defeat-title">Du bist gefallen</h2>

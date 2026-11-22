@@ -46,6 +46,7 @@ export function mountInventory({ dialog, inventory, onUse, onOpenChange }) {
     for (const [index, { item, quantity, equipped }] of slots.entries()) {
       const row = element('li', 'bag-item');
       row.dataset.kind = item.kind;
+      if (item.rarity) row.dataset.rarity = item.rarity;
       const glyph = element('span', 'bag-glyph', item.glyph);
       glyph.setAttribute('aria-hidden', 'true');
       const details = element('div', 'bag-details');
@@ -74,6 +75,19 @@ export function mountInventory({ dialog, inventory, onUse, onOpenChange }) {
         });
         row.append(action);
         if (activeItem === action.dataset.bagAction) focusTarget = action;
+      }
+      if (!equipped) {
+        const discard = element('button', 'bag-action bag-discard', '×');
+        discard.type = 'button';
+        discard.dataset.bagAction = 'discard:' + index;
+        discard.setAttribute('aria-label', item.name + ' wegwerfen');
+        discard.addEventListener('click', () => {
+          if (window.confirm(item.name + ' wegwerfen?') && inventory.discard(index)) {
+            feedback.textContent = item.name + ' weggeworfen.';
+            closeButton.focus({ preventScroll: true });
+          }
+        });
+        row.append(discard);
       }
       rows.append(row);
     }

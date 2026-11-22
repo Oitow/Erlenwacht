@@ -1,12 +1,17 @@
 const KEY_ACTIONS = new Map([
   ['Space', 'cast'],
   ['KeyF', 'breakSeal'],
+  ['KeyC', 'arc'],
   ['KeyQ', 'jump'],
   ['KeyE', 'interact'],
   ['KeyI', 'inventory'],
   ['KeyB', 'inventory'],
   ['KeyR', 'auto'],
+  ['KeyM', 'menu'],
+  ['KeyK', 'skills'],
+  ['Enter', 'chat'],
 ]);
+const MENU_ACTIONS = new Set(['menu', 'skills', 'chat']);
 const MOVEMENT_KEYS = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
@@ -67,9 +72,13 @@ export function createInput({ canvas, stick, nub }) {
       jump: actions.has('jump'),
       cast: actions.has('cast'),
       breakSeal: actions.has('breakSeal'),
+      arc: actions.has('arc'),
       interact: actions.has('interact'),
       inventory: actions.has('inventory'),
       auto: actions.has('auto'),
+      menu: actions.has('menu'),
+      skills: actions.has('skills'),
+      chat: actions.has('chat'),
       sprint: keys.has('ShiftLeft') || keys.has('ShiftRight'),
       lookX,
       lookY,
@@ -97,9 +106,10 @@ export function createInput({ canvas, stick, nub }) {
     const element = event.target;
     if (element instanceof HTMLElement) {
       if (element.isContentEditable || element.matches('input, textarea, select')) return;
-      if (event.code === 'Space' && element.matches('button, a, [role="button"]')) return;
+      if ((event.code === 'Space' || event.code === 'Enter') && element.matches('button, a, [role="button"]')) return;
     }
     const action = KEY_ACTIONS.get(event.code);
+    if (element instanceof Element && element.closest('#adventure-menu') && !MENU_ACTIONS.has(action)) return;
     if (MOVEMENT_KEYS.has(event.code)) {
       event.preventDefault();
       keys.add(event.code);

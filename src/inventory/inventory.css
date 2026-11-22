@@ -156,3 +156,6 @@
     height: 32px;
   }
 }
+.bag-item[data-rarity='uncommon'] .bag-name { color: #a8d795; }
+.bag-item[data-rarity='rare'] .bag-name { color: #c4acf4; }
+.bag-discard { min-width: 36px; padding-inline: 0.35rem; }
