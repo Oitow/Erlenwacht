@@ -1,20 +1,32 @@
 # Erlenwacht
 
-Private dark-fantasy, mobile-first MMO prototype.
+Erlenwacht ist ein mobiles Dark-Fantasy-RPG im Browser. Der Dammerwald führt über alte Ruinen zu einer begehbaren Enklave. Folge den Laternen, bekämpfe Schattenwesen und sprich mit der Torwache im Innenhof.
 
-## Direction
-A vast, atmospheric world with a polished Dammerwald tutorial passage leading to a populated enclave. Gritty art direction, strong light/shadow contrast, large-scale nature, smooth procedural characters, expressive AoE combat, auto-casting, meaningful skill trees, inventory and loot.
+## Starten
 
-## Rendering experiments
-- Meshes remain authoritative for collisions, navigation and gameplay.
-- SDF experiments for procedural shapes, animation and spell visuals.
-- Gaussian splatting is optional environment detail, with LOD, memory budgets and fallback for mobile browsers.
+GitHub Pages kann das Projekt direkt aus dem Repository bereitstellen. Lokal genügt ein HTTP-Server im Repository-Stammverzeichnis:
 
-## Source migration
-The existing Enklave prototype lives at [Oitow/pag/games/enklave](https://github.com/Oitow/pag/tree/main/games/enklave). It imports shared modules from PAG's engine; migrate the complete transitive dependencies before calling the standalone port playable. Do not replace the source repo.
+```sh
+python3 -m http.server 8000
+```
 
-## Workstreams
-See [Issues](https://github.com/Oitow/Erlenwacht/issues). Keep experiments on branches and use reviewed pull requests; no automatic merges.
+Öffne anschließend http://localhost:8000. Der Browser benötigt WebGL 2 und eine Internetverbindung für die fest versionierte Three.js-Abhängigkeit.
 
-## Current status
-Project planning initialized. Gameplay migration and playable build are not yet complete.
+## Steuerung
+
+| Aktion | Tastatur und Maus | Touch |
+| --- | --- | --- |
+| Laufen | WASD oder Pfeiltasten | Linker Stick |
+| Sprinten | Umschalt gedrückt halten | — |
+| Kamera drehen | Im Spielbild ziehen | Auf dem Spielbild ziehen |
+| Runenstoß | Leertaste | Rune |
+| Auto-Zauber | R | Auto |
+| Springen | Q | Sprung |
+| Aufheben oder sprechen | E | Eingeblendete Aktion |
+| Beutel | I | Beutel |
+
+Am Tor wird der Rastpunkt gespeichert. Beute, Ausrüstung und der Auftragsfortschritt bleiben beim Neuladen im selben Browser erhalten. Beim Tod kehrst du mit vollem Leben zum letzten Rastpunkt zurück.
+
+## Entwicklung
+
+Die [Architektur](docs/ARCHITECTURE.md) beschreibt die Modulgrenzen. Dieser Meilenstein ist ein lokaler Einzelspieler-Prototyp für das spätere MMO-RPG. Netzwerk, Konten und gemeinsame Welten sind künftige Erweiterungen. Der Erlenwacht-Prototyp hat einen eigenständigen Einstieg. Die ursprüngliche [Enklave in PAG](https://github.com/Oitow/pag/tree/main/games/enklave) bleibt ein separates Projekt.
