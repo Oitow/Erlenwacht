@@ -20,6 +20,7 @@
         <section class="objective" aria-label="Gebiet und Aufgabe">
           <h1 id="region">Dammerwald</h1>
           <p id="objective">Folge dem Laternenpfad zur Enklave.</p>
+          <p id="waypoint" hidden><span id="waypoint-arrow" aria-hidden="true">↑</span> <span id="waypoint-range"></span></p>
         </section>
         <button id="bag" type="button" aria-haspopup="dialog" aria-keyshortcuts="I">
           <span aria-hidden="true">◇</span> Beutel <span id="bag-count"></span>
@@ -31,6 +32,14 @@
         <meter id="health" min="0" max="100" low="30" optimum="100" value="100" aria-label="Leben"></meter>
       </section>
 
+      <section id="boss" aria-label="Reliktwächter" hidden>
+        <div class="health-label">
+          <span>Reliktwächter</span>
+          <span id="boss-status"></span>
+        </div>
+        <meter id="boss-health" min="0" max="14" aria-label="Leben des Reliktwächters"></meter>
+      </section>
+
       <div class="game-footer">
         <p id="notice" role="status"></p>
         <button id="interact" type="button" aria-keyshortcuts="E" hidden></button>
@@ -40,6 +49,7 @@
           <div class="actions">
             <button id="auto" type="button" aria-pressed="false" aria-keyshortcuts="R">Auto</button>
             <button id="jump" type="button" aria-keyshortcuts="Q">Sprung</button>
+            <button id="break-seal" type="button" aria-keyshortcuts="F" title="Schild brechen und Angriffe unterbrechen" hidden>Siegel<br>bruch</button>
             <button id="spell" type="button" aria-keyshortcuts="Space">✦ <span>Rune</span></button>
           </div>
         </div>

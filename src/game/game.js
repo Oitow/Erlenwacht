@@ -9,6 +9,7 @@ import { createInventory, INVENTORY_CAPACITY, ITEMS } from '../inventory/invento
 import { mountInventory } from '../inventory/view.js';
 import { createHud } from '../ui/hud.js';
 import { createLoot } from './loot.js';
+import { createWardenContract } from './warden-contract.js';
 import { openSave } from './save.js';
 
 const MAX_HEALTH = 100;
@@ -17,6 +18,7 @@ const GUIDE_RANGE = 3.4;
 const GATE_RANGE = 6;
 const CONTROLS = {
   spell: 'cast',
+  'break-seal': 'breakSeal',
   jump: 'jump',
   auto: 'auto',
   interact: 'interact',
@@ -40,6 +42,8 @@ export function startGame({ onError }) {
   const save = openSave();
   const inventory = createInventory(save.data?.inventory);
   const combat = createCombat(render.scene, world, save.data?.defeated);
+  const contract = createWardenContract(save.data?.wardenContract, world.relic.id);
+  combat.setEncounterActive(world.relic.id, contract.encounterActive);
   const loot = createLoot(render.scene, world, save.data?.loot);
   const defeat = byId('defeat');
 
@@ -56,6 +60,7 @@ export function startGame({ onError }) {
     dirty = false;
     const written = save.write({
       quest, auto,
+      wardenContract: contract.stage,
       inventory: inventory.serialize(),
       defeated: combat.defeatedIds(),
       loot: loot.serialize(),
@@ -73,6 +78,7 @@ export function startGame({ onError }) {
 
   function respawn() {
     const anchor = quest === 'trail' ? world.spawn : world.checkpoint;
+    combat.resetEncounter(world.relic.id);
     character.reset(anchor.x, anchor.z);
     camera.reset(position);
     hp = MAX_HEALTH;
@@ -112,26 +118,58 @@ export function startGame({ onError }) {
 
   function onDefeat(drop) {
     loot.add(drop);
+    if (contract.defeat(drop.id)) {
+      hud.notice('Reliktwächter gefallen. Kehre zur Torwache zurück.', 5);
+    }
     dirty = true;
   }
 
-  function interactWithWorld(drop, nearGuide) {
-    if (nearGuide) {
-      if (quest === 'complete') {
-        hud.notice('Torwache · Die Enklave steht dir offen.');
-        return;
-      }
+  function speakToGuide() {
+    if (quest !== 'complete') {
       if (!inventory.add(REWARD, 1)) {
         hud.notice('Torwache · Mach Platz für deine Belohnung.');
         return;
       }
       quest = 'complete';
       applyHealth(MAX_HEALTH);
-      hud.notice('Torwache · Nimm die Wächterklinge und leg sie im Beutel an.', 5);
-    } else if (drop) {
+      hud.notice('Torwache · Leg die Wächterklinge im Beutel an. Sprich mich für einen Auftrag erneut an.', 6);
+      return;
+    }
+
+    if (contract.accept()) {
+      combat.setEncounterActive(world.relic.id, true);
+      hud.notice('Siegelbruch gelernt. Brich damit den Schild und greif mit der Rune an.', 6);
+      dirty = true;
+      return;
+    }
+    if (contract.stage === 'return') {
+      if (contract.claim(inventory)) {
+        applyHealth(MAX_HEALTH);
+        hud.notice('Auftrag abgeschlossen · Siegelklinge erhalten.', 5);
+      } else {
+        hud.notice('Torwache · Mach Platz für die Siegelklinge.');
+      }
+      return;
+    }
+    hud.notice(contract.encounterActive
+      ? 'Torwache · Folge dem Pfeil zurück in die Ruinen.'
+      : 'Torwache · Die Ruinen sind wieder sicher.');
+  }
+
+  function interactWithWorld(drop, nearGuide) {
+    if (drop) {
       const quantity = loot.collect(drop, inventory);
       hud.notice(quantity ? '+' + quantity + ' ' + ITEMS[drop.itemId].name : 'Dein Beutel ist voll.');
+    } else if (nearGuide) {
+      speakToGuide();
     }
+  }
+
+  function currentObjective() {
+    if (quest === 'trail') return ['trail', world.gate];
+    if (quest === 'enclave') return ['enclave', world.guide];
+    if (contract.encounterActive) return ['hunt', world.relic];
+    return [contract.stage, contract.stage === 'complete' ? null : world.guide];
   }
 
   function update(dt) {
@@ -170,14 +208,23 @@ export function startGame({ onError }) {
     if (actions.interact) interactWithWorld(drop, nearGuide);
 
     combat.update(dt, {
-      position, cast: actions.cast, auto, damageMultiplier, onDamage, onDefeat,
+      position, cast: actions.cast, breakSeal: contract.skillUnlocked && actions.breakSeal,
+      auto, damageMultiplier, onDamage, onDefeat,
     });
     loot.update(dt);
+    const [objective, target] = currentObjective();
+    const nextDrop = actions.interact ? loot.closest(position) : drop;
+    const targetDistance = target ? distance(position, target) : 0;
     hud.update(dt, {
       region: world.regionAt(position.x, position.z),
-      quest,
-      interaction: nearGuide ? 'Mit Torwache sprechen' : drop ? ITEMS[drop.itemId].name + ' aufnehmen' : '',
+      objective,
+      targetDistance,
+      bearing: target && camera.bearingTo(target.x - position.x, target.z - position.z),
+      interaction: nextDrop ? ITEMS[nextDrop.itemId].name + ' aufnehmen' : nearGuide ? 'Mit Torwache sprechen' : '',
       cooldown: combat.cooldown,
+      sealUnlocked: contract.skillUnlocked,
+      sealCooldown: combat.sealCooldown,
+      boss: combat.encounterStatus(world.relic.id, position),
     });
     flushSave();
   }

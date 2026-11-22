@@ -1,5 +1,6 @@
 const KEY_ACTIONS = new Map([
   ['Space', 'cast'],
+  ['KeyF', 'breakSeal'],
   ['KeyQ', 'jump'],
   ['KeyE', 'interact'],
   ['KeyI', 'inventory'],
@@ -65,6 +66,7 @@ export function createInput({ canvas, stick, nub }) {
       z: z / movementMagnitude,
       jump: actions.has('jump'),
       cast: actions.has('cast'),
+      breakSeal: actions.has('breakSeal'),
       interact: actions.has('interact'),
       inventory: actions.has('inventory'),
       auto: actions.has('auto'),

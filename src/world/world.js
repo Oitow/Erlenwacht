@@ -73,16 +73,27 @@ export function createWorld(scene, { seed = 813 } = {}) {
   const gate = { x: 0, z: -147 };
   const checkpoint = { x: 0, z: -158 };
   const guide = { x: 4, z: -173 };
+  const relic = { id: 'relic-warden', x: pathCenter(-111) - 3.1, z: -111 };
   const encounters = ENCOUNTER_LAYOUT.map(([z, offset], i) => ({
     x: pathCenter(z) + offset,
     z,
     archetype: i % 3 === 2 ? 'sentinel' : 'hunter',
   }));
 
+  encounters.push({ ...relic, archetype: 'warden', optional: true });
+
   addTerrain(scene);
   addPath(scene);
   buildForest(scenery, collision, encounters, seed);
   buildSettlement(scenery, collision, gate, guide);
+  for (const offset of [-2.9, 2.9]) {
+    const x = relic.x - 1.1;
+    const z = relic.z + offset;
+    const y = heightAt(x, z);
+    scenery.add('column', 0x56514e, x, y + 1.1, z, 0.55, 2.2, 0.55);
+    scenery.add('flame', 0xcca8ff, x, y + 2.35, z, 0.42, 0.58, 0.42);
+    collision.addCircle(x, z, 0.45);
+  }
   const update = createLanterns(scene, scenery);
   scenery.assemble();
   update(0, spawn);
@@ -99,6 +110,7 @@ export function createWorld(scene, { seed = 813 } = {}) {
     checkpoint,
     gate,
     guide,
+    relic,
     bounds: { ...WORLD_BOUNDS },
     encounters,
     heightAt,
