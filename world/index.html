@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#131c1c">
+  <title>World Lab · Erlenwacht</title>
+  <link rel="stylesheet" href="./lab.css">
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}
+  </script>
+  <script type="module" src="./boot.js"></script>
+</head>
+<body>
+  <main>
+    <canvas id="viewport" aria-label="3D-Welt"></canvas>
+    <header id="hud" hidden>
+      <section class="location" aria-label="Aktueller Standort">
+        <p class="eyebrow">Erlenwacht · World Lab</p>
+        <h1 id="region">Erlenwacht</h1>
+        <p id="objective">Erkunde den Pfad und sammle Materialien.</p>
+        <p id="waypoint" hidden><span id="arrow" aria-hidden="true">↑</span><span id="destination"></span></p>
+      </section>
+      <nav aria-label="Weltmenü">
+        <button id="open-map" type="button" aria-haspopup="dialog" aria-keyshortcuts="M">Karte</button>
+        <button id="open-pack" type="button" aria-haspopup="dialog" aria-keyshortcuts="I">Beutel</button>
+        <button id="open-options" type="button" aria-haspopup="dialog" aria-keyshortcuts="Escape">Labor</button>
+      </nav>
+    </header>
+    <div class="touch-controls" hidden id="touch-controls">
+      <div id="joystick" aria-hidden="true"><div id="thumb"></div></div>
+      <div class="touch-actions">
+        <button id="descend" type="button" hidden>Sinken</button>
+        <button id="jump" type="button">Sprung</button>
+        <button id="sprint" type="button">Sprint</button>
+      </div>
+    </div>
+    <button id="interact" type="button" hidden></button>
+    <div id="hint" role="status" hidden></div>
+    <output id="stats" hidden></output>
+    <div id="travel" hidden></div>
+    <div id="boot" role="status">
+      <a href="../">← Erlenwacht</a>
+      <h2>World Lab</h2>
+      <p id="boot-message">Das Gelände wird aufgebaut …</p>
+    </div>
+
+    <dialog id="map-dialog" aria-labelledby="map-title">
+      <header><h2 id="map-title">Weltkarte</h2><button type="button" data-close aria-label="Karte schließen">×</button></header>
+      <div class="map-frame">
+        <canvas id="map" width="300" height="300" tabindex="0" aria-label="Weltkarte. Ziele lassen sich auch über die Liste auswählen."></canvas>
+        <span class="north" aria-hidden="true">N ↑</span>
+      </div>
+      <div class="map-controls">
+        <button id="zoom-map" type="button" aria-pressed="false">Umgebung</button>
+        <label for="poi">Reiseziel</label>
+        <select id="poi"></select>
+      </div>
+      <p id="poi-detail"></p>
+      <div class="row">
+        <button id="track" type="button" class="accent">Ziel markieren</button>
+        <button id="teleport" type="button">Teleport im Labor</button>
+      </div>
+    </dialog>
+
+    <dialog id="pack-dialog" aria-labelledby="pack-title">
+      <header><h2 id="pack-title">Reisebeutel</h2><button type="button" data-close aria-label="Beutel schließen">×</button></header>
+      <ul id="inventory"></ul>
+      <p>Setze ein Wegfeuer und kehre von überall dorthin zurück. Es kostet 3 Holz und 2 Stein.</p>
+      <div class="row">
+        <button id="build" type="button" class="accent">Wegfeuer bauen</button>
+        <button id="return-beacon" type="button">Zum Wegfeuer</button>
+      </div>
+    </dialog>
+
+    <dialog id="options-dialog" aria-labelledby="options-title">
+      <header><h2 id="options-title">World Lab</h2><button type="button" data-close aria-label="Labor schließen">×</button></header>
+      <section class="fields" aria-label="Weltsteuerung">
+        <label>Grafik <select id="quality"><option value="low">Mobil</option><option value="medium">Ausgewogen</option><option value="high">Weitsicht</option></select></label>
+        <label>Licht <select id="daylight"><option value="dawn">Morgengrauen</option><option value="day">Tag</option><option value="dusk">Abendrot</option><option value="night">Nacht</option><option value="cycle">Tageslauf</option></select></label>
+        <label>Wetter <select id="weather"><option value="clear">Klar</option><option value="mist">Nebel</option><option value="storm">Regen</option></select></label>
+        <label>Reisemodus <select id="movement"><option value="walk">Zu Fuß &amp; Gleiter</option><option value="ride">Schnellreise am Boden</option><option value="fly">Freiflug</option></select></label>
+        <label class="check"><input id="diagnostics" type="checkbox"> Leistung anzeigen</label>
+      </section>
+      <form id="seed-form">
+        <label for="seed">Welt-Seed</label>
+        <div class="row">
+          <input id="seed" name="seed" maxlength="64" required autocomplete="off">
+          <button type="submit" class="accent">Laden</button>
+          <button type="button" id="random-seed">Zufall</button>
+        </div>
+      </form>
+      <section id="catalog-section">
+        <h3>Prozedurale Assets</h3>
+        <div class="row">
+          <label for="asset-kind" class="visually-hidden">Asset</label><select id="asset-kind"></select>
+          <label for="asset-lod" class="visually-hidden">Detailstufe</label><select id="asset-lod"><option value="0">Nah</option><option value="1">Mittel</option><option value="2">Fern</option></select>
+          <label for="asset-variant" class="visually-hidden">Variante</label><select id="asset-variant"><option value="0">V1</option><option value="1">V2</option><option value="2">V3</option><option value="3">V4</option></select>
+        </div>
+        <div id="asset-preview" aria-hidden="true"></div>
+        <p id="asset-info"></p>
+      </section>
+      <details>
+        <summary>Steuerung</summary>
+        <p>WASD oder Pfeiltasten zum Laufen. Maus ziehen zum Drehen, Mausrad für Kameraabstand. Shift sprintet, Leertaste springt und öffnet in der Luft den Gleiter, E sammelt. Im Freiflug steigst du mit Leertaste und sinkst mit X.</p>
+        <p>Auf Touch-Geräten steuerst du links und drehst die Kamera durch Ziehen rechts. Die Aktion erscheint in Reichweite.</p>
+      </details>
+      <a href="../">← Zum Abenteuer</a>
+    </dialog>
+  </main>
+</body>
+</html>
