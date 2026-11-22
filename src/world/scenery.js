@@ -7,6 +7,7 @@ const CONE = 'cone';
 const STONE = 'stone';
 const FLAME = 'flame';
 const MARK = 'mark';
+const CELL_SIZE = 60;
 
 export function createScenery(scene) {
   const geometries = {
@@ -20,18 +21,22 @@ export function createScenery(scene) {
   const matte = new THREE.MeshStandardMaterial({ roughness: 0.96 });
   const glowing = new THREE.MeshBasicMaterial();
   const buckets = new Map();
+  const chunks = new Map();
+  let active = new Set();
+  let lastColumn;
+  let lastRow;
 
   function add(shape, color, x, y, z, sx, sy, sz, yaw = 0, tilt = 0) {
-    const cell = Math.floor(x / 60) + ':' + Math.floor(z / 60);
+    const cell = Math.floor(x / CELL_SIZE) + ':' + Math.floor(z / CELL_SIZE);
     const key = shape + ':' + cell;
-    if (!buckets.has(key)) buckets.set(key, { shape, placements: [] });
+    if (!buckets.has(key)) buckets.set(key, { shape, cell, placements: [] });
     buckets.get(key).placements.push({ x, y, z, sx, sy, sz, yaw, tilt, color });
   }
 
   function assemble() {
     const transform = new THREE.Object3D();
     const color = new THREE.Color();
-    for (const { shape, placements } of buckets.values()) {
+    for (const { shape, cell, placements } of buckets.values()) {
       const material = shape === FLAME || shape === MARK ? glowing : matte;
       const mesh = new THREE.InstancedMesh(geometries[shape], material, placements.length);
       placements.forEach((p, i) => {
@@ -45,11 +50,39 @@ export function createScenery(scene) {
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
       mesh.computeBoundingSphere();
-      scene.add(mesh);
+      if (!chunks.has(cell)) {
+        const chunk = new THREE.Group();
+        chunk.visible = false;
+        chunks.set(cell, chunk);
+        scene.add(chunk);
+      }
+      chunks.get(cell).add(mesh);
     }
+    buckets.clear();
   }
 
-  return { add, assemble };
+  function update(position) {
+    const column = Math.floor(position.x / CELL_SIZE);
+    const row = Math.floor(position.z / CELL_SIZE);
+    if (column === lastColumn && row === lastRow) return;
+    lastColumn = column;
+    lastRow = row;
+    const nearby = new Set();
+    for (let z = row - 3; z <= row + 3; z++) {
+      for (let x = column - 3; x <= column + 3; x++) {
+        const chunk = chunks.get(`${x}:${z}`);
+        if (!chunk) continue;
+        chunk.visible = true;
+        nearby.add(chunk);
+      }
+    }
+    for (const chunk of active) {
+      if (!nearby.has(chunk)) chunk.visible = false;
+    }
+    active = nearby;
+  }
+
+  return { add, assemble, update };
 }
 
 export function makeRandom(seed) {
@@ -77,6 +110,7 @@ export function buildForest({ add }, collision, encounters, seed) {
     const twist = random() * Math.PI;
     const trunkColor = bark[Math.floor(random() * bark.length)];
     const pineColor = Math.floor(random() * leaves.length);
+    if (z < -240) return;
     add(COLUMN, trunkColor, x, y + height * 0.46, z, width, height, width, twist);
     const branches = hero ? 4 : 2;
     for (let branch = 0; branch < branches; branch++) {
@@ -90,7 +124,7 @@ export function buildForest({ add }, collision, encounters, seed) {
       add(CONE, leaves[(pineColor + layer) % leaves.length], x, y + height * (0.66 + layer * 0.15),
         z, crown, height * 0.46, crown * 0.92, twist + layer * 0.45);
     }
-    if (Math.abs(x) < 113 && z > -228 && z < 75) collision.addCircle(x, z, width * 0.83);
+    if (z > -239 && z < 75) collision.addCircle(x, z, width * 0.83);
   }
 
   for (let row = -280; row < 97; row += 8) {
@@ -199,8 +233,15 @@ export function buildSettlement({ add }, collision, gate, guide) {
     }
   }
 
-  addMasonry(add, 0, backZ, 61, 2.4, wallTop, footing);
-  collision.addBox(0, backZ, 61, 2.4);
+  for (const side of [-1, 1]) {
+    addMasonry(add, side * 18, backZ, 25, 2.4, wallTop, footing);
+    collision.addBox(side * 18, backZ, 25, 2.4);
+    addMasonry(add, side * 5.8, backZ, 2, 3.2, 8.2, wall);
+    collision.addBox(side * 5.8, backZ, 2, 3.2);
+    add(FLAME, 0xffa96a, side * 5.8, heightAt(side * 5.8, backZ) + 5.2, backZ - 1.7,
+      0.2, 0.38, 0.19);
+  }
+  add(BOX, wall, 0, heightAt(0, backZ) + 7.85, backZ, 12.6, 2.4, 2.8);
 
   const gateY = heightAt(0, gate.z);
   add(BOX, footing, 0, gateY + 7.9, gate.z, 13, 3, 3);
@@ -244,11 +285,26 @@ export function buildSettlement({ add }, collision, gate, guide) {
   add(MARK, 0x99743e, x, y + 0.09, z, 0.7, 0.7, 0.7, 0, -Math.PI / 2);
   collision.addCircle(x, z, 0.34);
 
-  const beaconY = heightAt(0, -198);
-  add(COLUMN, footing, 0, beaconY + 0.24, -198, 2.45, 0.55, 2.45);
-  add(COLUMN, wall, 0, beaconY + 1.35, -198, 0.68, 2.2, 0.68);
-  add(STONE, roof, 0, beaconY + 2.26, -198, 1.06, 0.45, 1.06);
-  add(FLAME, 0xffa44d, 0, beaconY + 2.82, -198, 0.38, 0.63, 0.38);
-  add(FLAME, 0xffd976, 0.18, beaconY + 2.72, -197.85, 0.25, 0.43, 0.26);
-  collision.addCircle(0, -198, 2.2);
+  const keepX = -23;
+  const keepZ = -198;
+  const keepY = heightAt(keepX, keepZ);
+  addMasonry(add, keepX, keepZ, 7.2, 7.6, 16.8, footing);
+  add(BOX, wall, keepX, keepY + 17.1, keepZ, 8.2, 1.3, 8.6);
+  add(CONE, roof, keepX, keepY + 21.05, keepZ, 5.65, 7.2, 5.65, Math.PI / 6);
+  for (const face of [-1, 1]) {
+    const slit = keepZ + face * 3.83;
+    add(FLAME, 0xc78343, keepX + 1.45, keepY + 14, slit, 0.33, 0.92, 0.06);
+    add(FLAME, 0xc78343, keepX - 1.45, keepY + 14, slit, 0.33, 0.92, 0.06);
+  }
+  collision.addBox(keepX, keepZ, 7.2, 7.6);
+
+  const beaconX = -5.4;
+  const beaconZ = -196;
+  const beaconY = heightAt(beaconX, beaconZ);
+  add(COLUMN, footing, beaconX, beaconY + 0.24, beaconZ, 2.45, 0.55, 2.45);
+  add(COLUMN, wall, beaconX, beaconY + 1.35, beaconZ, 0.68, 2.2, 0.68);
+  add(STONE, roof, beaconX, beaconY + 2.26, beaconZ, 1.06, 0.45, 1.06);
+  add(FLAME, 0xffa44d, beaconX, beaconY + 2.82, beaconZ, 0.38, 0.63, 0.38);
+  add(FLAME, 0xffd976, beaconX + 0.18, beaconY + 2.72, beaconZ + 0.15, 0.25, 0.43, 0.26);
+  collision.addCircle(beaconX, beaconZ, 2.2);
 }

@@ -10,15 +10,17 @@ import { mountInventory } from '../inventory/view.js';
 import { createHud } from '../ui/hud.js';
 import { createLoot } from './loot.js';
 import { createWardenContract } from './warden-contract.js';
+import { createProgression } from './progression.js';
+import { createExpedition } from './expedition.js';
 import { openSave } from './save.js';
 
-const MAX_HEALTH = 100;
-const REWARD = 'warden-blade';
 const GUIDE_RANGE = 3.4;
 const GATE_RANGE = 6;
+const WEAPON_TINTS = { 'warden-blade': 0xe3c08a, 'seal-blade': 0xbda2ef, 'thorn-blade': 0x8fcb93 };
 const CONTROLS = {
   spell: 'cast',
   'break-seal': 'breakSeal',
+  'thorn-lance': 'arc',
   jump: 'jump',
   auto: 'auto',
   interact: 'interact',
@@ -37,52 +39,104 @@ export function startGame({ onError }) {
   const character = createCharacter(render.scene, world);
   const { position } = character;
   const camera = createCamera(render.camera, world);
-  const hud = createHud();
   const input = createInput({ canvas, stick: byId('stick'), nub: byId('nub') });
   const save = openSave();
   const inventory = createInventory(save.data?.inventory);
   const combat = createCombat(render.scene, world, save.data?.defeated);
   const contract = createWardenContract(save.data?.wardenContract, world.relic.id);
+  const expedition = createExpedition(save.data?.expedition, world);
   combat.setEncounterActive(world.relic.id, contract.encounterActive);
+  combat.setEncounterActive(world.expeditionBoss.id, expedition.encounterActive);
   const loot = createLoot(render.scene, world, save.data?.loot);
   const defeat = byId('defeat');
+  const legacyKills = Array.isArray(save.data?.defeated)
+    ? new Set(save.data.defeated.filter(id => Number.isInteger(id) && id >= 0 && id < 14)).size
+    : 0;
+  const progression = createProgression(save.data?.progression, legacyKills * 22);
 
-  let hp = MAX_HEALTH;
+  let hp = progression.maxHealth;
   let auto = save.data?.auto === true;
   let quest = save.data?.quest === 'complete' ? 'complete'
     : save.data?.quest === 'enclave' ? 'enclave' : 'trail';
+  let tutorial = save.data?.tutorial === 'path' ? 'path'
+    : save.data?.tutorial === 'loot' || legacyKills > 0 ? 'loot' : 'fight';
   let dirty = false;
   let saveAvailable = true;
   let damageMultiplier = 1;
+  let healthBonus = 0;
+
+  const hud = createHud({
+    onOpenChange: () => input.clear(),
+    onUpgrade(id) {
+      if (!progression.upgrade(id, contract.skillUnlocked)) return false;
+      const state = updateProgression();
+      report(state.skills.find(skill => skill.id === id).name + ' verbessert.');
+      dirty = true;
+      flushSave();
+      return true;
+    },
+    onChat: sendChat,
+    onBag: () => bag.toggle(),
+    onToggleAuto: toggleAuto,
+  });
 
   function flushSave() {
     if (!dirty) return;
     dirty = false;
     const written = save.write({
-      quest, auto,
+      quest, tutorial, auto,
       wardenContract: contract.stage,
+      expedition: expedition.serialize(),
+      progression: progression.serialize(),
       inventory: inventory.serialize(),
       defeated: combat.defeatedIds(),
       loot: loot.serialize(),
     });
-    if (saveAvailable && !written) {
-      hud.notice('Der Browser konnte den Spielstand nicht speichern.', 6);
-    }
+    if (saveAvailable && !written) hud.notice('Der Browser konnte den Spielstand nicht speichern.', 6);
     saveAvailable = written;
   }
 
+  function report(message, author = 'System', seconds = 4) {
+    hud.notice(message, seconds);
+    hud.chat(author, message, author === 'System' ? 'system' : 'npc');
+  }
+
   function applyHealth(amount) {
-    hp = Math.max(0, Math.min(MAX_HEALTH, hp + amount));
-    hud.health(hp);
+    const maxHealth = progression.maxHealth + healthBonus;
+    hp = Math.max(0, Math.min(maxHealth, hp + amount));
+    hud.health(hp, maxHealth);
+  }
+
+  function updateProgression() {
+    const state = progression.view(contract.skillUnlocked);
+    hud.progress(state);
+    return state;
+  }
+
+  function gainXp(amount) {
+    if (progression.gain(amount)) {
+      if (hp > 0) applyHealth(Infinity);
+      report('Stufe ' + progression.level + ' erreicht. Im Fähigkeitenmenü kannst du einen Punkt vergeben.' +
+        (progression.level === 2 ? ' Dornlanze gelernt.' : ''), 'System', 6);
+    }
+    updateProgression();
+    dirty = true;
+  }
+
+  function toggleAuto() {
+    auto = !auto;
+    hud.auto(auto);
+    dirty = true;
+    flushSave();
   }
 
   function respawn() {
-    const anchor = quest === 'trail' ? world.spawn : world.checkpoint;
+    const anchor = quest === 'trail' ? world.spawn : expedition.checkpoint ?? world.checkpoint;
     combat.resetEncounter(world.relic.id);
+    combat.resetEncounter(world.expeditionBoss.id);
     character.reset(anchor.x, anchor.z);
     camera.reset(position);
-    hp = MAX_HEALTH;
-    hud.health(hp);
+    applyHealth(Infinity);
     input.clear();
     if (defeat.open) defeat.close();
   }
@@ -92,7 +146,7 @@ export function startGame({ onError }) {
     inventory,
     onOpenChange: () => input.clear(),
     onUse(id) {
-      if (hp === MAX_HEALTH || !inventory.use(id)) return false;
+      if (hp === progression.maxHealth + healthBonus || !inventory.use(id)) return false;
       applyHealth(ITEMS[id].heal);
       flushSave();
       return true;
@@ -100,7 +154,11 @@ export function startGame({ onError }) {
   });
 
   function inventoryChanged() {
-    damageMultiplier = 1 + (ITEMS[inventory.equipped()]?.spellPower ?? 0);
+    const weapon = inventory.equipped();
+    damageMultiplier = 1 + (ITEMS[weapon]?.spellPower ?? 0);
+    healthBonus = ITEMS[inventory.equipped('amulet')]?.maxHealth ?? 0;
+    character.setWeapon(weapon, WEAPON_TINTS[weapon]);
+    applyHealth(0);
     hud.slots(inventory.slots().length, INVENTORY_CAPACITY);
     dirty = true;
   }
@@ -108,6 +166,7 @@ export function startGame({ onError }) {
   function onDamage(amount) {
     if (hp === 0) return;
     applyHealth(-amount);
+    character.playHit();
     if (hp > 0) {
       hud.notice('Getroffen · −' + amount + ' Leben');
     } else {
@@ -118,58 +177,124 @@ export function startGame({ onError }) {
 
   function onDefeat(drop) {
     loot.add(drop);
+    for (const bonus of drop.bonusDrops ?? []) loot.add(bonus);
+    if (quest === 'trail' && tutorial === 'fight') {
+      tutorial = 'loot';
+      report('Erster Gegner besiegt. Geh zum leuchtenden Fundstück und sammle es ein.');
+    }
+    gainXp(drop.xp);
     if (contract.defeat(drop.id)) {
-      hud.notice('Reliktwächter gefallen. Kehre zur Torwache zurück.', 5);
+      report('Reliktwächter gefallen. Kehre zur Torwache zurück.');
+    }
+    if (expedition.defeat(drop.id)) {
+      report('Der Hüter der Krähenwarte ist gefallen. Melde dich bei der Torwache.');
     }
     dirty = true;
   }
 
   function speakToGuide() {
-    if (quest !== 'complete') {
-      if (!inventory.add(REWARD, 1)) {
-        hud.notice('Torwache · Mach Platz für deine Belohnung.');
+    if (quest === 'trail') return;
+    if (quest === 'enclave') {
+      if (!inventory.add('warden-blade')) {
+        report('Mach Platz für deine Wächterklinge.', 'Torwache');
         return;
       }
       quest = 'complete';
-      applyHealth(MAX_HEALTH);
-      hud.notice('Torwache · Leg die Wächterklinge im Beutel an. Sprich mich für einen Auftrag erneut an.', 6);
+      applyHealth(Infinity);
+      gainXp(40);
+      report('Leg die Wächterklinge im Beutel an. Sprich mich für deinen ersten Auftrag erneut an.', 'Torwache', 6);
       return;
     }
-
     if (contract.accept()) {
       combat.setEncounterActive(world.relic.id, true);
-      hud.notice('Siegelbruch gelernt. Brich damit den Schild und greif mit der Rune an.', 6);
+      updateProgression();
+      report('Siegelbruch gelernt. Brich damit den Schild des Reliktwächters und greif mit der Rune an.', 'Torwache', 6);
       dirty = true;
       return;
     }
     if (contract.stage === 'return') {
       if (contract.claim(inventory)) {
-        applyHealth(MAX_HEALTH);
-        hud.notice('Auftrag abgeschlossen · Siegelklinge erhalten.', 5);
+        applyHealth(Infinity);
+        gainXp(80);
+        report('Gut gekämpft. Die Siegelklinge gehört dir. Sprich mich erneut auf die Nordmark an.', 'Torwache', 6);
       } else {
-        hud.notice('Torwache · Mach Platz für die Siegelklinge.');
+        report('Mach Platz für die Siegelklinge.', 'Torwache');
       }
       return;
     }
-    hud.notice(contract.encounterActive
-      ? 'Torwache · Folge dem Pfeil zurück in die Ruinen.'
-      : 'Torwache · Die Ruinen sind wieder sicher.');
+    if (contract.encounterActive) {
+      report('Folge dem Pfeil zurück in die Ruinen.', 'Torwache');
+      return;
+    }
+    if (expedition.accept()) {
+      report('Nimm das Nordtor. Der Wachtstein liegt an der Kreuzung zum Moor und zum Steinbruch.', 'Torwache', 6);
+      dirty = true;
+    } else if (expedition.stage === 'return') {
+      if (expedition.claim(inventory)) {
+        gainXp(180);
+        report('Das Amulett der Krähenwarte gehört dir. Leg es im Beutel an.', 'Torwache', 6);
+      } else {
+        report('Mach Platz für das Amulett der Krähenwarte.', 'Torwache');
+      }
+    } else {
+      report(expedition.objective, 'Torwache');
+    }
   }
 
   function interactWithWorld(drop, nearGuide) {
     if (drop) {
       const quantity = loot.collect(drop, inventory);
-      hud.notice(quantity ? '+' + quantity + ' ' + ITEMS[drop.itemId].name : 'Dein Beutel ist voll.');
+      if (quantity) {
+        if (quest === 'trail' && tutorial === 'loot') tutorial = 'path';
+        report('+' + quantity + ' ' + ITEMS[drop.itemId].name);
+      } else {
+        hud.notice('Dein Beutel ist voll.');
+      }
     } else if (nearGuide) {
       speakToGuide();
     }
   }
 
   function currentObjective() {
-    if (quest === 'trail') return ['trail', world.gate];
-    if (quest === 'enclave') return ['enclave', world.guide];
-    if (contract.encounterActive) return ['hunt', world.relic];
-    return [contract.stage, contract.stage === 'complete' ? null : world.guide];
+    if (quest === 'trail') {
+      if (tutorial === 'fight') {
+        return ['Laufe zum Lager und triff einen Gegner aus der Nähe mit der Rune.', world.training];
+      }
+      if (tutorial === 'loot') {
+        return ['Sammle leuchtende Beute ein oder folge den Laternen weiter zur Enklave.', world.gate];
+      }
+      return ['Folge den Laternen bis zum Tor. Der Beutel enthält deine Beute und Heiltränke.', world.gate];
+    }
+    if (quest === 'enclave') return ['Sprich mit der Torwache im Innenhof.', world.guide];
+    if (contract.encounterActive) {
+      return ['Brich den Schild des Reliktwächters mit Siegelbruch. Greif dann mit der Rune an.', world.relic];
+    }
+    if (contract.stage === 'return') return ['Melde den Sieg bei der Torwache.', world.guide];
+    if (contract.stage === 'offer') return ['Hol dir einen Auftrag bei der Torwache.', world.guide];
+    return [expedition.objective, expedition.target];
+  }
+
+  function sendChat(text) {
+    const message = text.trim();
+    if (!message) return;
+    hud.chat('Du', message, 'local');
+    switch (message.toLowerCase()) {
+      case '/hilfe':
+        hud.chat('System', '/quest · aktives Ziel | /ort · aktuelles Gebiet | /wache · Hinweis der Torwache');
+        break;
+      case '/quest':
+        hud.chat('System', currentObjective()[0]);
+        break;
+      case '/ort':
+        hud.chat('System', world.regionAt(position.x, position.z));
+        break;
+      case '/wache':
+        hud.chat('Torwache', currentObjective()[0], 'npc');
+        break;
+      default:
+        if (message.startsWith('/')) hud.chat('System', 'Unbekannter Befehl. Zeige mit /hilfe die Befehle an.');
+        break;
+    }
   }
 
   function update(dt) {
@@ -178,20 +303,21 @@ export function startGame({ onError }) {
       flushSave();
       return;
     }
-    if (actions.inventory) {
-      bag.toggle();
-      return;
-    }
     if (bag.isOpen()) {
+      if (actions.inventory) bag.close();
       flushSave();
       return;
     }
-
-    if (actions.auto) {
-      auto = !auto;
-      hud.auto(auto);
-      dirty = true;
+    if (hud.handleActions(actions) || hud.isOpen()) {
+      flushSave();
+      return;
     }
+    if (actions.inventory) {
+      bag.toggle();
+      flushSave();
+      return;
+    }
+    if (actions.auto) toggleAuto();
     camera.orientMovement(actions);
     character.update(dt, actions);
     camera.update(dt, position);
@@ -199,32 +325,46 @@ export function startGame({ onError }) {
 
     if (quest === 'trail' && distance(position, world.gate) < GATE_RANGE) {
       quest = 'enclave';
-      applyHealth(MAX_HEALTH);
-      hud.notice('Rastpunkt erreicht · Enklave');
+      applyHealth(Infinity);
+      report('Rastpunkt erreicht · Enklave');
       dirty = true;
     }
-    const nearGuide = distance(position, world.guide) < GUIDE_RANGE;
+    const discovery = expedition.scout(position);
+    if (discovery) {
+      combat.setEncounterActive(world.expeditionBoss.id, expedition.encounterActive);
+      gainXp(28);
+      report(discovery === world.landmarks.crossroads.name ? 'Rastpunkt erreicht · ' + discovery : discovery + ' entdeckt.');
+    }
+    const nearGuide = quest !== 'trail' && distance(position, world.guide) < GUIDE_RANGE;
     const drop = loot.closest(position);
     if (actions.interact) interactWithWorld(drop, nearGuide);
 
     combat.update(dt, {
       position, cast: actions.cast, breakSeal: contract.skillUnlocked && actions.breakSeal,
-      auto, damageMultiplier, onDamage, onDefeat,
+      arc: progression.arcUnlocked && actions.arc,
+      burstRank: progression.rank('rune'), arcRank: progression.rank('arc'), sealRank: progression.rank('seal'),
+      auto, damageMultiplier: damageMultiplier * (1 + (progression.level - 1) * 0.035),
+      onDamage, onDefeat, onCast: character.playCast,
     });
-    loot.update(dt);
-    const [objective, target] = currentObjective();
+    loot.update(dt, position);
+    const [objectiveText, target] = currentObjective();
     const nextDrop = actions.interact ? loot.closest(position) : drop;
-    const targetDistance = target ? distance(position, target) : 0;
+    const relic = combat.encounterStatus(world.relic.id, position);
+    const watchkeeper = combat.encounterStatus(world.expeditionBoss.id, position);
     hud.update(dt, {
       region: world.regionAt(position.x, position.z),
-      objective,
-      targetDistance,
+      objectiveText,
+      targetName: target?.name,
+      targetDistance: target ? distance(position, target) : 0,
       bearing: target && camera.bearingTo(target.x - position.x, target.z - position.z),
       interaction: nextDrop ? ITEMS[nextDrop.itemId].name + ' aufnehmen' : nearGuide ? 'Mit Torwache sprechen' : '',
       cooldown: combat.cooldown,
       sealUnlocked: contract.skillUnlocked,
       sealCooldown: combat.sealCooldown,
-      boss: combat.encounterStatus(world.relic.id, position),
+      arcUnlocked: progression.arcUnlocked,
+      arcCooldown: combat.arcCooldown,
+      boss: relic ? { ...relic, name: 'Reliktwächter' }
+        : watchkeeper && { ...watchkeeper, name: 'Hüter der Krähenwarte' },
     });
     flushSave();
   }
@@ -242,6 +382,8 @@ export function startGame({ onError }) {
   inventoryChanged();
   dirty = false;
   hud.auto(auto);
+  updateProgression();
+  hud.chat('System', 'Erlenwacht · Lokaler Chat. Tippe /hilfe für die Befehle.');
   respawn();
 
   startLoop({

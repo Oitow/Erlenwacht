@@ -11,7 +11,7 @@
 | `src/character` | Motion, avatar with procedural animation, orbit camera and device input | Add actions to the input adapter and motion states to the character |
 | `src/combat` | Encounter behavior, target rules, rune cooldown and defeat events | Add archetypes or introduce skills in `src/combat/skills.js` |
 | `src/inventory` | Item definitions, capacity, stacks, equipment and bag dialog | Add item definitions and equipment effects |
-| `src/game` | Session orchestration, quest, checkpoint, loot and save | Extend the quest flow or supply another persistence adapter |
+| `src/game` | Session orchestration, tutorial, expedition, loot, XP and save | Extend the quest flow or supply another persistence adapter |
 | `src/ui` | Health, objective, performance and interaction feedback | Render state supplied by the session |
 
 A fixed step samples inputs, updates character motion and camera, checks the checkpoint and interactions, runs combat, and updates loot and feedback. The world provides terrain contact and collision for both enemies and the player. The inventory model publishes changes to the bag and session. The session translates combat defeat events into world drops and translates equip effects into combat parameters.
@@ -22,10 +22,10 @@ Scenery uses instanced, spatially grouped meshes. Two lights are reused for near
 
 ## Persistence
 
-Save format v1 writes a single localStorage snapshot for quest and warden contract progress, bag contents, equipped item, auto-cast preference, defeated encounter IDs, and uncollected world drops. The quest determines the spawn or enclave checkpoint on reload. Health and camera orientation reset there. Original encounter IDs retain their numeric indexes. New encounters can use explicit IDs that survive reordering. Preserve the original indexes or migrate the save format before reordering those entries. Existing v1 saves that reached the Enclave can accept the warden contract from the guard.
+Save format v1 uses one localStorage snapshot for quest progress, XP, skill ranks, bag contents, equipment, auto-cast preference, permanent encounter defeats, and outstanding loot. XP is initialized from recorded forest kills when the saved game predates progression. The quest and expedition progress select the checkpoint on reload. Keep the original numeric encounter IDs stable for save compatibility. Give new encounters explicit IDs. Repeatable encounters respawn on a timer and store no permanent defeat records.
 
 This is a client-side simulation suited to a static host. Shared worlds will require server-owned state for movement validation, combat, loot and inventory. Keep renderer and input separate when replacing the local session authority.
 
 ## Gameplay check
 
-Run from a nested URL. Verify keyboard and portrait touch movement, camera orbit, jump, manual and auto spell casts. Follow the lanterns through the gate, collect a drop, talk to the guard, equip the reward and reload to verify the checkpoint and inventory. Check the death and respawn loop separately.
+Run from a nested URL. Verify keyboard and portrait touch movement, camera orbit, jump, and manual and auto spell casts. Collect the first drop, follow the lanterns to the gate, talk to the guard and equip the reward. Break the Relic Warden's shield, turn in the contract, follow the expedition landmarks and defeat the Watchkeeper. Upgrade a skill, equip the amulet, and reload to verify the saved checkpoint, equipment and ranks. Check death, respawn and the local chat commands.

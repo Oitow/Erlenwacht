@@ -47,6 +47,48 @@ export const ITEMS = Object.freeze({
     maxStack: 1,
     glyph: '✦',
     spellPower: 2,
+    rarity: 'rare',
+  }),
+  'amber-tonic': Object.freeze({
+    id: 'amber-tonic',
+    name: 'Bernsteintrank',
+    description: 'Stellt bis zu 60 Leben wieder her.',
+    kind: 'consumable',
+    maxStack: 5,
+    glyph: '✚',
+    heal: 60,
+    rarity: 'uncommon',
+  }),
+  'bog-iron': Object.freeze({
+    id: 'bog-iron',
+    name: 'Mooreisen',
+    description: 'Ein verhärtetes Erzstück aus der Nordmark.',
+    kind: 'material',
+    maxStack: 25,
+    glyph: '⬢',
+    rarity: 'uncommon',
+  }),
+  'thorn-blade': Object.freeze({
+    id: 'thorn-blade',
+    name: 'Dornklinge',
+    description: 'Verstärkt Runenstoß und Dornlanze.',
+    kind: 'equipment',
+    equipmentSlot: 'weapon',
+    maxStack: 1,
+    glyph: '✦',
+    spellPower: 2.35,
+    rarity: 'rare',
+  }),
+  'watch-amulet': Object.freeze({
+    id: 'watch-amulet',
+    name: 'Amulett der Krähenwarte',
+    description: '+24 maximales Leben.',
+    kind: 'equipment',
+    equipmentSlot: 'amulet',
+    maxStack: 1,
+    glyph: '◈',
+    maxHealth: 24,
+    rarity: 'rare',
   }),
 });
 
@@ -120,6 +162,15 @@ export function createInventory(saved) {
       const index = stacks.findIndex(stack => stack.id === id);
       if (index < 0) return false;
       if (--stacks[index].quantity === 0) stacks.splice(index, 1);
+      notify();
+      return true;
+    },
+    discard(index) {
+      const stack = stacks[index];
+      if (!stack || (equipment.get(ITEMS[stack.id].equipmentSlot) === stack.id && count(stack.id) === stack.quantity)) {
+        return false;
+      }
+      stacks.splice(index, 1);
       notify();
       return true;
     },
