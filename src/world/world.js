@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import {
-  WORLD_BOUNDS, TRAIL_BRANCHES, addPath, addTerrain, expeditionBiome, heightAt, pathCenter,
+  WORLD_BOUNDS, TRAIL_BRANCHES, addPath, addTerrain, expeditionBiome, heightAt, pathCenter, surfaceAt,
 } from './terrain.js';
 import { createCollision } from './collision.js';
 import { buildForest, buildSettlement, createScenery } from './scenery.js';
 import {
   buildExpedition, buildTrailCamp, createExpeditionEncounters, EXPEDITION_BOSS, EXPEDITION_LANDMARKS,
 } from './expedition.js';
+import { buildEnclaveWayfire, buildStarter } from './starter.js';
+import { STARTER } from './starter-layout.js';
 
 const ENCOUNTER_LAYOUT = [
   [12, 2.4], [1, -3.6], [-11, -1.9], [-24, 3.5], [-33, -4.7],
@@ -14,8 +16,12 @@ const ENCOUNTER_LAYOUT = [
   [-96, 4.9], [-105, -2], [-119, 2.9], [-126, -4.1],
 ];
 
-function createLanterns(scene, { add }) {
+function createLanterns(scene, { add }, checkpoint) {
   const lanterns = [];
+  function register(x, z, aboveGround, color) {
+    lanterns.push({ position: new THREE.Vector3(x, heightAt(x, z) + aboveGround, z), color });
+  }
+
   function lantern(x, z, height = 2.25, flame = 0xffba63) {
     const y = heightAt(x, z);
     add('stone', 0x4a4f4e, x, y + 0.21, z, 0.41, 0.28, 0.41);
@@ -23,9 +29,16 @@ function createLanterns(scene, { add }) {
     add('box', 0x302c29, x, y + height - 0.08, z, 0.47, 0.14, 0.47);
     add('flame', flame, x, y + height + 0.21, z, 0.28, 0.36, 0.28);
     add('cone', 0x3f3c37, x, y + height + 0.58, z, 0.43, 0.34, 0.43, Math.PI / 6);
-    lanterns.push({ position: new THREE.Vector3(x, y + height + 0.23, z), color: flame });
+    register(x, z, height + 0.23, flame);
   }
 
+  register(STARTER.camp.x, STARTER.camp.z, 1.02, 0xffba76);
+  register(STARTER.workbench.x - 1.83, STARTER.workbench.z - 0.97, 2.45, 0xffac60);
+  register(STARTER.beacon.x, STARTER.beacon.z, 2.56, 0xffb86a);
+  register(checkpoint.x - 4.1, checkpoint.z - 1.6, 1.02, 0xffac60);
+  for (let z = 173, side = 1; z >= 48; z -= 13, side *= -1) {
+    lantern(pathCenter(z) + side * 4.8, z, 2.25, 0xffba81);
+  }
   for (let z = 35; z > -143; z -= 14) {
     const x = pathCenter(z);
     lantern(x - 4.9, z);
@@ -90,7 +103,7 @@ function createLanterns(scene, { add }) {
 export function createWorld(scene, { seed = 813 } = {}) {
   const scenery = createScenery(scene);
   const collision = createCollision();
-  const spawn = { x: 0, z: 39 };
+  const spawn = { ...STARTER.camp.arrival };
   const gate = { x: 0, z: -147 };
   const checkpoint = { x: 0, z: -158 };
   const expeditionCheckpoint = { x: pathCenter(-249), z: -249 };
@@ -109,8 +122,10 @@ export function createWorld(scene, { seed = 813 } = {}) {
   const updateTerrain = addTerrain(scene);
   addPath(scene);
   buildForest(scenery, collision, trailEncounters, seed);
+  buildStarter(scene, scenery, collision, seed);
   buildTrailCamp(scenery, collision);
   buildSettlement(scenery, collision, gate, guide);
+  buildEnclaveWayfire(scenery, collision, checkpoint);
   buildExpedition(scene, scenery, collision, expeditionEncounters, landmarks, seed);
   for (const offset of [-2.9, 2.9]) {
     const x = relic.x - 1.1;
@@ -120,7 +135,7 @@ export function createWorld(scene, { seed = 813 } = {}) {
     scenery.add('flame', 0xcca8ff, x, y + 2.35, z, 0.42, 0.58, 0.42);
     collision.addCircle(x, z, 0.45);
   }
-  const updateLanterns = createLanterns(scene, scenery);
+  const updateLanterns = createLanterns(scene, scenery, checkpoint);
   scenery.assemble();
   updateTerrain(spawn, true);
   updateLanterns(0, spawn);
@@ -133,6 +148,12 @@ export function createWorld(scene, { seed = 813 } = {}) {
   }
 
   function regionAt(x, z) {
+    if (z > 56) {
+      if (z > 175 && z < 207 && Math.abs(x) < 27) return STARTER.camp.name;
+      if (x < -27 && x > -83 && z > 105 && z < 151) return 'Schilfsenke';
+      if (x > 30 && x < 87 && z > 120 && z < 174) return 'Falkenkamm';
+      return 'Aschenpass';
+    }
     if (Math.abs(x) < 30 && z < gate.z - 2 && z > -216) return 'Enklave';
     if (z < -232) {
       const biome = expeditionBiome(x, z);
@@ -154,11 +175,13 @@ export function createWorld(scene, { seed = 813 } = {}) {
     guide,
     relic,
     training,
+    starter: STARTER,
     landmarks,
     expeditionBoss,
     bounds: { ...WORLD_BOUNDS },
     encounters: [...trailEncounters, ...expeditionEncounters],
-    heightAt,
+    heightAt: surfaceAt,
+    setNodeAvailable: scenery.setTrackedVisible,
     resolveMovement: collision.resolveMovement,
     regionAt,
     update,

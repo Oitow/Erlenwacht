@@ -1,5 +1,7 @@
 import { INVENTORY_CAPACITY } from './inventory.js';
 
+const RARITY = { uncommon: 'Ungewöhnlich', rare: 'Selten' };
+
 function element(tag, className, text) {
   const node = document.createElement(tag);
   node.className = className;
@@ -52,12 +54,15 @@ export function mountInventory({ dialog, inventory, onUse, onOpenChange }) {
       const details = element('div', 'bag-details');
       const name = element('span', 'bag-name', item.name + (quantity > 1 ? ' ×' + quantity : ''));
       const description = element('p', 'bag-description', item.description);
-      details.append(name, description);
-      row.append(glyph, details);
+      const actions = element('div', 'bag-actions');
+      details.append(name);
+      if (RARITY[item.rarity]) details.append(element('span', 'bag-rarity', RARITY[item.rarity]));
+      details.append(description);
+      row.append(glyph, details, actions);
 
       if (equipped) {
         const state = element('span', 'bag-equipped', 'Angelegt');
-        row.append(state);
+        actions.append(state);
       } else if (item.kind === 'consumable' || (item.kind === 'equipment' && inventory.equipped(item.equipmentSlot) !== item.id)) {
         const usable = item.kind === 'consumable';
         const action = element('button', 'bag-action', usable ? 'Trinken' : 'Anlegen');
@@ -67,13 +72,13 @@ export function mountInventory({ dialog, inventory, onUse, onOpenChange }) {
         action.addEventListener('click', () => {
           if (usable) {
             const used = onUse(item.id);
-            if (used === true) feedback.textContent = 'Du hast einen Heiltrank getrunken.';
+            if (used === true) feedback.textContent = item.name + ' getrunken.';
             if (used === false) feedback.textContent = 'Dein Leben ist bereits voll.';
           } else if (inventory.equip(item.id)) {
             feedback.textContent = item.name + ' angelegt.';
           }
         });
-        row.append(action);
+        actions.append(action);
         if (activeItem === action.dataset.bagAction) focusTarget = action;
       }
       if (!equipped) {
@@ -87,7 +92,7 @@ export function mountInventory({ dialog, inventory, onUse, onOpenChange }) {
             closeButton.focus({ preventScroll: true });
           }
         });
-        row.append(discard);
+        actions.append(discard);
       }
       rows.append(row);
     }

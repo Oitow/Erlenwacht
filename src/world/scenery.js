@@ -22,15 +22,17 @@ export function createScenery(scene) {
   const glowing = new THREE.MeshBasicMaterial();
   const buckets = new Map();
   const chunks = new Map();
+  const tracked = new Map();
+  const hiddenMatrix = new THREE.Matrix4().makeTranslation(0, -2048, 0);
   let active = new Set();
   let lastColumn;
   let lastRow;
 
-  function add(shape, color, x, y, z, sx, sy, sz, yaw = 0, tilt = 0) {
+  function add(shape, color, x, y, z, sx, sy, sz, yaw = 0, tilt = 0, trackedId = null) {
     const cell = Math.floor(x / CELL_SIZE) + ':' + Math.floor(z / CELL_SIZE);
     const key = shape + ':' + cell;
     if (!buckets.has(key)) buckets.set(key, { shape, cell, placements: [] });
-    buckets.get(key).placements.push({ x, y, z, sx, sy, sz, yaw, tilt, color });
+    buckets.get(key).placements.push({ x, y, z, sx, sy, sz, yaw, tilt, color, trackedId });
   }
 
   function assemble() {
@@ -46,6 +48,10 @@ export function createScenery(scene) {
         transform.updateMatrix();
         mesh.setMatrixAt(i, transform.matrix);
         mesh.setColorAt(i, color.setHex(p.color));
+        if (p.trackedId) {
+          if (!tracked.has(p.trackedId)) tracked.set(p.trackedId, { visible: true, instances: [] });
+          tracked.get(p.trackedId).instances.push({ mesh, index: i, matrix: transform.matrix.clone() });
+        }
       });
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
@@ -82,7 +88,17 @@ export function createScenery(scene) {
     active = nearby;
   }
 
-  return { add, assemble, update };
+  function setTrackedVisible(id, visible) {
+    const entry = tracked.get(id);
+    if (!entry || entry.visible === visible) return;
+    entry.visible = visible;
+    for (const { mesh, index, matrix } of entry.instances) {
+      mesh.setMatrixAt(index, visible ? matrix : hiddenMatrix);
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  return { add, assemble, update, setTrackedVisible };
 }
 
 export function makeRandom(seed) {
@@ -99,7 +115,7 @@ export function buildForest({ add }, collision, encounters, seed) {
   const leaves = [0x15392f, 0x204435, 0x294736, 0x253e3c, 0x1a3032];
   const rocks = [0x3b4440, 0x53564f, 0x384847];
   function openArea(x, z) {
-    return Math.abs(x - pathCenter(z)) > 7 && (z > -141 || Math.abs(x) > 38)
+    return Math.abs(x - pathCenter(Math.min(z, 54))) > 7 && (z > -141 || Math.abs(x) > 38)
       && !encounters.some((foe) => Math.hypot(x - foe.x, z - foe.z) < 3.3);
   }
 
@@ -110,7 +126,7 @@ export function buildForest({ add }, collision, encounters, seed) {
     const twist = random() * Math.PI;
     const trunkColor = bark[Math.floor(random() * bark.length)];
     const pineColor = Math.floor(random() * leaves.length);
-    if (z < -240) return;
+    if (z < -240 || z > 76) return;
     add(COLUMN, trunkColor, x, y + height * 0.46, z, width, height, width, twist);
     const branches = hero ? 4 : 2;
     for (let branch = 0; branch < branches; branch++) {

@@ -31,7 +31,7 @@ export const ITEMS = Object.freeze({
   'warden-blade': Object.freeze({
     id: 'warden-blade',
     name: 'Wächterklinge',
-    description: '+1 Schaden für den Runenstoß.',
+    description: 'Verdoppelt den Fähigkeitsschaden gegenüber der Pfadklinge.',
     kind: 'equipment',
     equipmentSlot: 'weapon',
     maxStack: 1,
@@ -41,7 +41,7 @@ export const ITEMS = Object.freeze({
   'seal-blade': Object.freeze({
     id: 'seal-blade',
     name: 'Siegelklinge',
-    description: '+2 Schaden für den Runenstoß.',
+    description: 'Verdreifacht den Fähigkeitsschaden gegenüber der Pfadklinge.',
     kind: 'equipment',
     equipmentSlot: 'weapon',
     maxStack: 1,
@@ -71,7 +71,7 @@ export const ITEMS = Object.freeze({
   'thorn-blade': Object.freeze({
     id: 'thorn-blade',
     name: 'Dornklinge',
-    description: 'Verstärkt Runenstoß und Dornlanze.',
+    description: 'Eine seltene Klinge mit höherem Fähigkeitsschaden als die Siegelklinge.',
     kind: 'equipment',
     equipmentSlot: 'weapon',
     maxStack: 1,
@@ -90,10 +90,85 @@ export const ITEMS = Object.freeze({
     maxHealth: 24,
     rarity: 'rare',
   }),
+  ashwood: Object.freeze({
+    id: 'ashwood', name: 'Eschenholz', description: 'Zähes Holz für Griffe und Runenfoki.',
+    kind: 'material', maxStack: 30, glyph: '╳',
+  }),
+  silverleaf: Object.freeze({
+    id: 'silverleaf', name: 'Silberblatt', description: 'Heilkraut für Tränke am Lager.',
+    kind: 'material', maxStack: 30, glyph: '✿',
+  }),
+  'iron-ore': Object.freeze({
+    id: 'iron-ore', name: 'Eisenerz', description: 'Rohstoff für einfache Schutzkleidung.',
+    kind: 'material', maxStack: 30, glyph: '⬢',
+  }),
+  'ashwood-focus': Object.freeze({
+    id: 'ashwood-focus', name: 'Eschenfokus', description: '+45 % Zauberschaden gegenüber der Pfadklinge.',
+    kind: 'equipment', equipmentSlot: 'weapon', maxStack: 1, glyph: '✦', spellPower: 0.45,
+    rarity: 'uncommon',
+  }),
+  'runebound-focus': Object.freeze({
+    id: 'runebound-focus', name: 'Runenfokus', description: '+125 % Zauberschaden gegenüber der Pfadklinge.',
+    kind: 'equipment', equipmentSlot: 'weapon', maxStack: 1, glyph: '✶', spellPower: 1.25,
+    rarity: 'rare',
+  }),
+  'field-tonic': Object.freeze({
+    id: 'field-tonic', name: 'Feldtrank', description: 'Stellt bis zu 45 Leben wieder her.',
+    kind: 'consumable', maxStack: 5, glyph: '✚', heal: 45,
+    rarity: 'uncommon',
+  }),
+  'silver-tonic': Object.freeze({
+    id: 'silver-tonic', name: 'Silberblatt-Elixier', description: 'Stellt bis zu 75 Leben wieder her.',
+    kind: 'consumable', maxStack: 5, glyph: '✚', heal: 75,
+    rarity: 'rare',
+  }),
+  'riveted-vest': Object.freeze({
+    id: 'riveted-vest', name: 'Nietweste', description: '+12 maximales Leben, 7 % weniger erlittener Schaden.',
+    kind: 'equipment', equipmentSlot: 'armor', maxStack: 1, glyph: '⬟', maxHealth: 12, armor: 0.07,
+    rarity: 'uncommon',
+  }),
+  'iron-jack': Object.freeze({
+    id: 'iron-jack', name: 'Eisenwams', description: '+24 maximales Leben, 14 % weniger erlittener Schaden.',
+    kind: 'equipment', equipmentSlot: 'armor', maxStack: 1, glyph: '⬟', maxHealth: 24, armor: 0.14,
+    rarity: 'rare',
+  }),
 });
 
 function getItem(id) {
   return typeof id === 'string' && Object.hasOwn(ITEMS, id) ? ITEMS[id] : null;
+}
+
+function validQuantity(quantity) {
+  return Number.isSafeInteger(quantity) && quantity > 0;
+}
+
+function insert(stacks, item, quantity) {
+  let remainder = quantity;
+  for (const stack of stacks) {
+    if (stack.id !== item.id) continue;
+    const moved = Math.min(item.maxStack - stack.quantity, remainder);
+    stack.quantity += moved;
+    remainder -= moved;
+    if (remainder === 0) return quantity;
+  }
+  while (remainder > 0 && stacks.length < INVENTORY_CAPACITY) {
+    const moved = Math.min(item.maxStack, remainder);
+    stacks.push({ id: item.id, quantity: moved });
+    remainder -= moved;
+  }
+  return quantity - remainder;
+}
+
+function consumeMaterial(stacks, id, quantity) {
+  for (let index = stacks.length - 1; index >= 0 && quantity > 0; index--) {
+    const stack = stacks[index];
+    if (stack.id !== id) continue;
+    const used = Math.min(quantity, stack.quantity);
+    stack.quantity -= used;
+    quantity -= used;
+    if (stack.quantity === 0) stacks.splice(index, 1);
+  }
+  return quantity === 0;
 }
 
 export function createInventory(saved) {
@@ -105,21 +180,20 @@ export function createInventory(saved) {
     for (const listener of listeners) listener();
   }
 
-  function insert(item, quantity) {
-    let remainder = quantity;
-    for (const stack of stacks) {
-      if (stack.id !== item.id) continue;
-      const moved = Math.min(item.maxStack - stack.quantity, remainder);
-      stack.quantity += moved;
-      remainder -= moved;
-      if (remainder === 0) return quantity;
+  function exchange(ingredients, product, preview = false) {
+    const item = getItem(product?.id);
+    if (!item || !validQuantity(product.quantity)) return 'unknown';
+    const draft = stacks.map(stack => ({ ...stack }));
+    for (const ingredient of ingredients) {
+      if (getItem(ingredient?.id)?.kind !== 'material' || !validQuantity(ingredient.quantity)) return 'unknown';
+      if (!consumeMaterial(draft, ingredient.id, ingredient.quantity)) return 'materials';
     }
-    while (remainder > 0 && stacks.length < INVENTORY_CAPACITY) {
-      const moved = Math.min(item.maxStack, remainder);
-      stacks.push({ id: item.id, quantity: moved });
-      remainder -= moved;
+    if (insert(draft, item, product.quantity) !== product.quantity) return 'full';
+    if (!preview) {
+      stacks.splice(0, stacks.length, ...draft);
+      notify();
     }
-    return quantity - remainder;
+    return null;
   }
 
   function count(id) {
@@ -135,28 +209,29 @@ export function createInventory(saved) {
   if (Array.isArray(saved?.slots)) {
     for (const stack of saved.slots) {
       const item = getItem(stack?.id);
-      if (!item || !Number.isSafeInteger(stack.quantity) || stack.quantity < 1) continue;
-      insert(item, Math.min(stack.quantity, item.maxStack));
+      if (!item || !validQuantity(stack.quantity)) continue;
+      insert(stacks, item, Math.min(stack.quantity, item.maxStack));
     }
     for (const [slot, id] of Object.entries(saved.equipment ?? {})) {
       const item = getItem(id);
       if (item?.equipmentSlot === slot) equipItem(item);
     }
   } else {
-    insert(ITEMS['trail-blade'], 1);
-    insert(ITEMS['health-tonic'], 2);
+    insert(stacks, ITEMS['trail-blade'], 1);
+    insert(stacks, ITEMS['health-tonic'], 2);
     equipItem(ITEMS['trail-blade']);
   }
 
   return {
     add(id, quantity = 1) {
       const item = getItem(id);
-      if (!item || !Number.isSafeInteger(quantity) || quantity < 1) return 0;
-      const accepted = insert(item, quantity);
+      if (!item || !validQuantity(quantity)) return 0;
+      const accepted = insert(stacks, item, quantity);
       if (accepted) notify();
       return accepted;
     },
     count,
+    exchange,
     use(id) {
       if (getItem(id)?.kind !== 'consumable') return false;
       const index = stacks.findIndex(stack => stack.id === id);

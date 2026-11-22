@@ -98,6 +98,19 @@
   font-weight: 650;
 }
 
+#inventory .bag-rarity {
+  display: inline-block;
+  margin-inline-start: 0.4em;
+  color: #c5c1b5;
+  font-size: 0.69rem;
+}
+
+#inventory .bag-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
 #inventory .bag-description {
   margin: 3px 0 0;
   color: #c5c1b5;
@@ -155,7 +168,12 @@
     width: 30px;
     height: 32px;
   }
+
+  #inventory .bag-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
-.bag-item[data-rarity='uncommon'] .bag-name { color: #a8d795; }
-.bag-item[data-rarity='rare'] .bag-name { color: #c4acf4; }
-.bag-discard { min-width: 36px; padding-inline: 0.35rem; }
+#inventory .bag-item[data-rarity='uncommon'] .bag-name { color: #a8d795; }
+#inventory .bag-item[data-rarity='rare'] .bag-name { color: #c4acf4; }
+#inventory .bag-discard { padding-inline: 0.35rem; }

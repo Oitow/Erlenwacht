@@ -1,5 +1,8 @@
+import { mountAdventurerPages } from './adventurer-pages.js';
+
 const CHAT_LIMIT = 48;
-const SECTIONS = ['menu', 'skills', 'chat'];
+const SHORTCUT_PAGES = ['menu', 'skills', 'chat'];
+const SECTIONS = ['menu', 'classes', 'skills', 'professions', 'travel', 'chat'];
 
 export function mountAdventureMenu(byId, callbacks) {
   const dialog = byId('adventure-menu');
@@ -20,6 +23,7 @@ export function mountAdventureMenu(byId, callbacks) {
   let page = 'menu';
   let unread = 0;
   let progression = { level: 1, xp: 0, nextXp: 100, points: 0, skills: [] };
+  const pages = mountAdventurerPages(byId, callbacks, close);
 
   function updateUnread() {
     unreadBadge.hidden = unread === 0;
@@ -84,6 +88,7 @@ export function mountAdventureMenu(byId, callbacks) {
       unread = 0;
       updateUnread();
     }
+    pages.show(page);
   }
 
   function open(next, focusComposer = false) {
@@ -106,7 +111,7 @@ export function mountAdventureMenu(byId, callbacks) {
 
   for (const [id, { button }] of tabs) {
     button.addEventListener('click', () => open(id));
-    byId(id + '-button').addEventListener('click', () => open(id));
+    byId(id + '-button')?.addEventListener('click', () => open(id));
   }
   closeButton.addEventListener('click', close);
   dialog.addEventListener('cancel', event => {
@@ -133,8 +138,11 @@ export function mountAdventureMenu(byId, callbacks) {
 
   return {
     isOpen: () => dialog.open,
+    openPage(name) {
+      if (tabs.has(name)) open(name);
+    },
     handleActions(actions) {
-      const next = SECTIONS.find(id => actions[id]);
+      const next = SHORTCUT_PAGES.find(id => actions[id]);
       if (!next) return false;
       if (dialog.open && next === page && next !== 'chat') close();
       else open(next, next === 'chat');
@@ -146,6 +154,15 @@ export function mountAdventureMenu(byId, callbacks) {
     progress(state) {
       progression = state;
       if (dialog.open && page === 'skills') renderSkills();
+    },
+    classes(state) {
+      pages.classes(state, dialog.open && page === 'classes');
+    },
+    professions(state) {
+      pages.professions(state, dialog.open && page === 'professions');
+    },
+    travel(state) {
+      pages.travel(state, dialog.open && page === 'travel');
     },
     chat(author, message, channel = 'system') {
       const reading = dialog.open && page === 'chat';

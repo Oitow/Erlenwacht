@@ -1,16 +1,23 @@
 import * as THREE from 'three';
+import { REED_BASIN, REED_BRIDGE, starterPath } from './starter-layout.js';
 
 const TILE_SIZE = 48;
 const GRID = 16;
 const STEP = TILE_SIZE / GRID;
 
-export const WORLD_BOUNDS = { minX: -192, maxX: 192, minZ: -474, maxZ: 74 };
+export const WORLD_BOUNDS = { minX: -192, maxX: 192, minZ: -474, maxZ: 264 };
 
-const MAIN_ROUTE = { start: -455, end: 55, center: pathCenter, width: 3.65 };
+const MAIN_ROUTE = { start: -455, end: 218, center: pathCenter, width: 3.65 };
 export const TRAIL_BRANCHES = [
   { start: -327, end: -254, center: moorPath, width: 2.2 },
   { start: -347, end: -274, center: quarryPath, width: 2.3 },
 ];
+
+const STARTER_BRANCHES = [
+  { start: 123, end: 155, center: z => fromStarter(z, 123, 155, -22), width: 1.9 },
+  { start: 141, end: 182, center: z => fromStarter(z, 141, 182, 63), width: 2.2 },
+];
+const BRANCHES = [...TRAIL_BRANCHES, ...STARTER_BRANCHES];
 
 export const MOOR_POOLS = [
   { x: -103, z: -304, width: 20, depth: 14 },
@@ -28,6 +35,7 @@ function soft(value) {
 }
 
 export function pathCenter(z) {
+  if (z > 54) return starterPath(z);
   if (z < -215) {
     const distance = (-215 - z) / 227;
     return 13 * Math.sin(distance * Math.PI * 2.6) * Math.sin(distance * Math.PI);
@@ -35,6 +43,11 @@ export function pathCenter(z) {
   if (z <= -137 || z >= 40) return 0;
   const distance = (40 - z) / 177;
   return 7 * Math.sin(distance * Math.PI * 3) * Math.sin(distance * Math.PI);
+}
+
+function fromStarter(z, start, end, x) {
+  const t = unit((end - z) / (end - start));
+  return starterPath(z) * (1 - t) + x * t;
 }
 
 function moorPath(z) {
@@ -49,13 +62,36 @@ function quarryPath(z) {
 
 export function trailDistance(x, z) {
   let distance = Math.abs(x - pathCenter(z));
-  for (const route of TRAIL_BRANCHES) {
+  for (const route of BRANCHES) {
     if (z <= route.end && z > route.start - 16) {
       const branchDistance = Math.abs(x - route.center(z)) * 0.66;
       distance += (Math.min(distance, branchDistance) - distance) * soft((z - route.start + 16) / 16);
     }
   }
   return distance;
+}
+
+function sampleStarterHeight(x, z) {
+  const trail = soft(trailDistance(x, z) / 40);
+  const ascent = soft((z - 52) / 145);
+  const plateau = 1.1 + ascent * 13.4 + Math.sin(z * 0.049) * (1 - ascent * 0.79);
+  const ridgeSlope = soft((x - 9) / 61);
+  const ridgeX = (x - 67) / 47;
+  const ridgeZ = (z - 151) / 45;
+  const ridgeHeight = ridgeSlope * Math.exp(-(ridgeX * ridgeX + ridgeZ * ridgeZ)) * 18;
+  const passX = (Math.abs(x) - 32) / 19;
+  const passZ = (z - 94) / 29;
+  const outcrop = 15.5 * Math.exp(-(passX * passX + passZ * passZ)) * soft(Math.abs(x) / 26);
+  const mountain = Math.max(0, (Math.abs(x) - 76) / 105);
+  let elevation = plateau + ridgeHeight + outcrop + trail * (1.95 * Math.sin(x * 0.079 + z * 0.047)
+    + 1.6 * Math.cos(x * 0.064 - z * 0.105))
+    + mountain * mountain * (34 + Math.cos(z * 0.061 + x * 0.037) * 22);
+
+  if (x < -12 && z > 106 && z < 158) {
+    const rim = poolRadius(REED_BASIN, x, z);
+    elevation += (2.25 + rim * 0.91 - elevation) * soft((1.5 - rim) / 0.48);
+  }
+  return elevation;
 }
 
 export function expeditionBiome(x, z) {
@@ -82,6 +118,7 @@ function sampleHeight(x, z) {
       + Math.cos(x * 0.145 + z * 0.074) * 0.9)
     + ridge * ridge * (3.1 + Math.sin(z * 0.063) * 2.4)
   );
+  if (z > 57) return original + (sampleStarterHeight(x, z) - original) * soft((z - 57) / 39);
   if (z >= -226) return original;
 
   const blend = soft((-226 - z) / 26);
@@ -119,6 +156,20 @@ export function heightAt(x, z) {
     + (1 - v) * topRight + (1 - u) * bottomLeft;
 }
 
+export function bridgeDeck(x) {
+  const { minX, maxX, z, y } = REED_BRIDGE;
+  if (x < minX + 7) return THREE.MathUtils.lerp(heightAt(minX, z), y, soft((x - minX) / 7));
+  if (x > maxX - 7) return THREE.MathUtils.lerp(heightAt(maxX, z), y, soft((maxX - x) / 7));
+  return y;
+}
+
+export function surfaceAt(x, z) {
+  const ground = heightAt(x, z);
+  const bridge = REED_BRIDGE;
+  if (x < bridge.minX || x > bridge.maxX || Math.abs(z - bridge.z) > bridge.width * 0.5) return ground;
+  return Math.max(ground, bridgeDeck(x));
+}
+
 function terrainColor(out, x, z) {
   const noise = Math.sin(x * 0.78 + z * 0.53) * Math.cos(z * 0.99 - x * 0.28);
   const moss = Math.sin(x * 0.095 + z * 0.059) * Math.cos(z * 0.133);
@@ -130,9 +181,13 @@ function terrainColor(out, x, z) {
   const moor = soft((-x - 23) / 65) * soft((-z - 251) / 26);
   const quarry = soft((x - 25) / 55) * soft((-z - 263) / 24);
   const frost = soft((-z - 373) / 78);
-  out.setRGB(groundTone * (0.69 + quarry * 1.05 + frost * 0.5) + roadTone + courtyardTone,
-    groundTone * (1.27 - quarry * 0.22 + frost * 0.25) + roadTone * 0.7 + courtyardTone * 0.85,
-    groundTone * (0.98 + moor * 0.74 + frost * 0.72) + roadTone * 0.41 + courtyardTone * 0.65);
+  const starter = soft((z - 54) / 57);
+  const reed = z > 105 && z < 159 ? (1 - soft(poolRadius(REED_BASIN, x, z) / 1.6)) * starter : 0;
+  const ash = starter - reed;
+  out.setRGB(groundTone * (0.69 + quarry * 1.05 + frost * 0.5 + ash * 0.85) + roadTone + courtyardTone,
+    groundTone * (1.27 - quarry * 0.22 + frost * 0.25 + reed * 0.42) + roadTone * 0.7 + courtyardTone * 0.85,
+    groundTone * (0.98 + moor * 0.74 + frost * 0.72 + ash * 0.17 + reed * 0.3)
+      + roadTone * 0.41 + courtyardTone * 0.65);
 }
 
 function createTile(originX, originZ, material) {
@@ -187,6 +242,8 @@ export function addTerrain(scene) {
   function update(position, initial = false) {
     const column = Math.floor(position.x / TILE_SIZE);
     const row = Math.floor(position.z / TILE_SIZE);
+    const jumped = centerColumn !== undefined
+      && Math.max(Math.abs(column - centerColumn), Math.abs(row - centerRow)) > 2;
     if (column !== centerColumn || row !== centerRow) {
       centerColumn = column;
       centerRow = row;
@@ -207,7 +264,7 @@ export function addTerrain(scene) {
         }
       }
     }
-    const budget = initial ? pending.length : 2;
+    const budget = initial ? pending.length : jumped ? 9 : 2;
     for (let i = 0; i < budget && pending.length; i++) {
       const tile = pending.shift();
       tile.mesh = createTile(tile.column * TILE_SIZE, tile.row * TILE_SIZE, material);
@@ -221,10 +278,11 @@ export function addTerrain(scene) {
 
 export function addPath(scene) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
-  for (const route of [MAIN_ROUTE, ...TRAIL_BRANCHES]) addRoute(scene, material, route);
+  addRoute(scene, material, MAIN_ROUTE, 0.1);
+  for (const route of BRANCHES) addRoute(scene, material, route, 0.125);
 }
 
-function addRoute(scene, material, route) {
+function addRoute(scene, material, route, lift) {
   const positions = [];
   const colors = [];
   const indices = [];
@@ -236,7 +294,7 @@ function addRoute(scene, material, route) {
     const width = route.width * (1 + Math.sin(z * 0.11) * 0.082);
     for (let i = 0; i < strips.length; i++) {
       const x = center + strips[i] * width;
-      positions.push(x, heightAt(x, z) + 0.1, z);
+      positions.push(x, heightAt(x, z) + lift, z);
       const grit = 1 + Math.sin((x + z) * 17.32) * 0.095;
       color.setHex(stripColors[i]).multiplyScalar(grit);
       colors.push(color.r, color.g, color.b);

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#111b20">
-  <title>Erlenwacht · Dammerwald</title>
+  <title>Erlenwacht</title>
   <link rel="stylesheet" href="./src/ui/game.css">
   <link rel="stylesheet" href="./src/inventory/inventory.css">
   <script type="importmap">
@@ -18,8 +18,9 @@
     <div id="hud" hidden>
       <header class="game-header">
         <section class="objective" aria-label="Gebiet und Aufgabe">
-          <h1 id="region">Dammerwald</h1>
-          <p id="objective">Folge dem Laternenpfad zur Enklave.</p>
+          <h1 id="region">Erlenwacht</h1>
+          <p id="tutorial-step" hidden></p>
+          <p id="objective"></p>
           <p id="waypoint" hidden><span id="waypoint-arrow" aria-hidden="true">↑</span> <span id="waypoint-destination" hidden></span> <span id="waypoint-range"></span></p>
         </section>
         <nav class="hud-nav" aria-label="Spielmenü">
@@ -30,6 +31,7 @@
       </header>
 
       <section class="vitals" aria-label="Charakterstatus">
+        <button id="classes-button" type="button" aria-haspopup="dialog" hidden>Klasse wählen</button>
         <div class="health-label"><span>Leben</span><span id="life">100 / 100</span></div>
         <meter id="health" min="0" max="100" low="30" optimum="100" value="100" aria-label="Leben"></meter>
         <button id="skills-button" type="button" aria-haspopup="dialog" aria-keyshortcuts="K">
@@ -55,9 +57,9 @@
           <div class="actions">
             <button id="auto" type="button" aria-pressed="false" aria-keyshortcuts="R">Auto</button>
             <button id="jump" type="button" aria-keyshortcuts="Q">Sprung</button>
-            <button id="break-seal" type="button" aria-keyshortcuts="F" title="Schild brechen und Angriffe unterbrechen" hidden>Siegel<br>bruch</button>
-            <button id="thorn-lance" type="button" aria-keyshortcuts="C" title="Gegner auf einer Linie treffen und unterbrechen" hidden>Dorn<br>lanze</button>
-            <button id="spell" type="button" aria-keyshortcuts="Space">✦ <span>Rune</span></button>
+            <button id="break-seal" type="button" aria-keyshortcuts="F" title="Schild brechen und Angriffe unterbrechen" hidden><span class="ability-label" id="seal-label">Siegelbruch</span></button>
+            <button id="thorn-lance" type="button" aria-keyshortcuts="C" title="Gegner auf einer Linie treffen und unterbrechen" hidden><span class="ability-label" id="arc-label">Dornlanze</span></button>
+            <button id="spell" type="button" aria-keyshortcuts="Space"><span aria-hidden="true">✦</span><span class="ability-label" id="spell-label">Rune</span></button>
           </div>
         </div>
         <div id="performance" aria-label="Bildrate"></div>
@@ -71,27 +73,49 @@
         </header>
         <nav class="menu-nav" aria-label="Menübereiche">
           <button id="menu-page-button" type="button" aria-controls="menu-page" aria-pressed="true">Übersicht</button>
+          <button id="classes-page-button" type="button" aria-controls="classes-page" aria-pressed="false">Charakter</button>
           <button id="skills-page-button" type="button" aria-controls="skills-page" aria-pressed="false">Fähigkeiten</button>
+          <button id="professions-page-button" type="button" aria-controls="professions-page" aria-pressed="false">Berufe</button>
+          <button id="travel-page-button" type="button" aria-controls="travel-page" aria-pressed="false">Reise</button>
           <button id="chat-page-button" type="button" aria-controls="chat-page" aria-pressed="false">Chat</button>
         </nav>
         <section id="menu-page" aria-label="Übersicht">
           <div class="menu-commands">
             <button id="menu-bag" type="button">Beutel öffnen</button>
-            <button id="menu-auto" type="button" aria-pressed="false">Automatische Runen</button>
+            <button id="menu-auto" type="button" aria-pressed="false">Automatische Angriffe</button>
           </div>
           <h3>Steuerung</h3>
           <dl class="control-guide">
             <div><dt>Laufen und sprinten</dt><dd>WASD / Umschalt · Stick auf Touch</dd></div>
             <div><dt>Kamera</dt><dd>Ziehen</dd></div>
             <div><dt>Interagieren und springen</dt><dd>E / Q</dd></div>
-            <div><dt>Rune, Siegelbruch, Dornlanze</dt><dd>Leertaste / F / C</dd></div>
+            <div><dt>Hauptangriff, Siegelbruch, Klassenfähigkeit</dt><dd>Leertaste / F / C</dd></div>
             <div><dt>Beutel, Fähigkeiten, Chat</dt><dd>I / K / Eingabe</dd></div>
           </dl>
+        </section>
+        <section id="classes-page" aria-labelledby="classes-title" hidden>
+          <h3 id="classes-title" class="menu-section-title">Klasse</h3>
+          <p id="classes-summary" class="menu-summary"></p>
+          <p id="classes-feedback" class="menu-feedback" role="status"></p>
+          <ul id="classes-list" class="skills-list"></ul>
         </section>
         <section id="skills-page" aria-label="Fähigkeiten" hidden>
           <p id="progress-summary"></p>
           <p id="skill-feedback" role="status"></p>
           <ul id="skills-list" class="skills-list"></ul>
+        </section>
+        <section id="professions-page" aria-labelledby="professions-title" hidden>
+          <h3 id="professions-title" class="menu-section-title">Handwerk</h3>
+          <p id="professions-summary" class="menu-summary"></p>
+          <ul id="profession-ranks" class="profession-ranks" aria-label="Berufsränge"></ul>
+          <p id="professions-feedback" class="menu-feedback" role="status"></p>
+          <ul id="professions-list" class="skills-list" aria-label="Rezepte"></ul>
+        </section>
+        <section id="travel-page" aria-labelledby="travel-title" hidden>
+          <h3 id="travel-title" class="menu-section-title">Wegmarken</h3>
+          <p id="travel-summary" class="menu-summary"></p>
+          <p id="travel-feedback" class="menu-feedback" role="status"></p>
+          <ul id="travel-list" class="skills-list"></ul>
         </section>
         <section id="chat-page" aria-label="Lokaler Chat" hidden>
           <div id="chat-log" role="log" aria-label="Nachrichten" tabindex="0">
@@ -116,7 +140,7 @@
     </dialog>
     <div id="boot" role="status">
       <strong>Erlenwacht</strong>
-      <p id="boot-message">Der Dammerwald lädt …</p>
+      <p id="boot-message">Die Spielwelt lädt …</p>
     </div>
     <noscript>Erlenwacht benötigt JavaScript.</noscript>
   </main>
