@@ -35,6 +35,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .game-header { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
 .hud-nav { display: flex; flex-wrap: wrap; justify-content: end; gap: 5px; }
 .hud-nav button { min-height: 44px; }
+#online-button { color: var(--muted); white-space: nowrap; }
+#online-button[data-state="connected"] { color: #e6f8cf; border-color: #a8c78a; background: #2e482e; }
+#online-button[data-state="connecting"], #online-button[data-state="reconnecting"] { color: var(--accent); }
 .objective {
   width: fit-content;
   max-width: 355px;
@@ -223,13 +226,14 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .menu-header h2 { margin: 0; font: 600 1.55rem/1.15 Georgia, serif; color: var(--accent); }
 #menu-close { min-width: 44px; padding: 0; font-size: 1.4rem; }
 .menu-nav {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1.2fr .8fr .7fr;
   gap: 6px;
   margin: 12px 0 15px;
   padding-bottom: 12px;
   border-bottom: 1px solid #756c5166;
 }
-.menu-nav button { flex: 1; padding-inline: 6px; }
+.menu-nav button { min-width: 0; padding-inline: 5px; font-size: .89rem; overflow-wrap: anywhere; }
 .menu-nav button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: #423625; }
 .menu-commands { display: flex; flex-wrap: wrap; gap: 7px; }
 .menu-sheet h3 { margin: 16px 0 5px; font-size: 1rem; }
@@ -254,6 +258,32 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .skills-list p { margin: 0; color: var(--muted); font-size: .86rem; }
 .skills-list button { flex: none; white-space: nowrap; padding-inline: 8px; }
 .skills-list button:disabled { color: var(--muted); border-color: #756c5166; cursor: default; }
+#online-title, #chat-mode { margin-top: 0; }
+#online-status {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid #756c5166;
+  border-left: 3px solid var(--border);
+  border-radius: 5px;
+  background: #101719;
+  overflow-wrap: anywhere;
+}
+#online-status[data-state="connected"] { border-left-color: #a8c78a; }
+#online-status[data-state="error"] { border-left-color: #e49382; }
+#online-status[data-state="connecting"], #online-status[data-state="reconnecting"] { border-left-color: var(--accent); }
+#online-status-message, #online-peers { color: var(--muted); font-size: .87rem; }
+#online-peers { margin: 6px 0 0; }
+#online-settings { min-width: 0; margin: 11px 0 12px; padding: 0; border: 0; }
+.online-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#online-form label { display: grid; gap: 4px; min-width: 0; font-size: .87rem; }
+#online-form input { width: 100%; }
+#online-form fieldset:disabled { color: var(--muted); }
+#online-form input:disabled { opacity: .7; }
+#online-advanced { margin-top: 9px; }
+#online-advanced summary { width: fit-content; padding: 7px 0; color: var(--accent); cursor: pointer; }
+#online-address-hint { margin: 4px 0 0; color: var(--muted); font-size: .79rem; }
+#online-connect { color: var(--accent); border-color: var(--accent); }
 #chat-log {
   min-height: 80px;
   max-height: min(34dvh, 260px);
@@ -270,11 +300,11 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 #chat-lines strong { color: var(--accent); font-size: .8rem; }
 #chat-lines li[data-channel="npc"] strong { color: #b9d9b3; }
 #chat-lines li[data-channel="local"] strong { color: #c7e7f0; }
+#chat-lines li[data-channel="room"] strong { color: #83d5d1; }
 #chat-form { margin-top: 12px; }
 #chat-form label { display: block; margin-bottom: 4px; color: var(--muted); }
 .chat-compose { display: flex; gap: 6px; }
-#chat-message {
-  flex: 1;
+#chat-message, #online-form input {
   min-width: 0;
   min-height: 42px;
   padding: 6px 9px;
@@ -285,7 +315,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   font: inherit;
   font-size: 16px;
 }
-#chat-message:focus-visible, #chat-log:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#chat-message { flex: 1; }
+#chat-message:focus-visible, #chat-log:focus-visible, #online-form input:focus-visible, #online-advanced summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 @media (pointer: coarse), (max-width: 620px) {
   .game-header { flex-direction: column-reverse; }
   .hud-nav { width: 100%; }
@@ -295,6 +326,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   #spell { grid-column: 3; grid-row: 1 / span 2; }
   #break-seal, #thorn-lance { min-height: 44px; }
   #adventure-menu { max-height: min(82dvh, 680px); }
+}
+@media (max-width: 390px) {
+  .hud-nav button { padding-inline: 8px; }
 }
 @media (max-width: 330px) {
   .actions { gap: 4px; }

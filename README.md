@@ -14,6 +14,21 @@ python3 -m http.server 8000
 
 Öffne anschließend http://localhost:8000. Der Browser benötigt WebGL 2 und eine Internetverbindung für die fest versionierte Three.js-Abhängigkeit.
 
+## Zusammen spielen
+
+Für einen Testraum startest du Erlenwacht mit Node.js 22 oder neuer aus dem Repository:
+
+```sh
+npm ci
+npm start
+```
+
+Öffne die vom Server angezeigte URL in zwei Browserprofilen oder auf zwei Geräten. Wähle im Menü **Online**, gib je einen Namen und in beiden Fenstern denselben Raumcode ein. Starte den Versuch mit zwei frischen Spielständen oder am selben Rastpunkt, damit sich die Figuren in Sichtweite befinden. Im **Chat** gehen normale Nachrichten an den Raum. Befehle wie `/quest` funktionieren weiterhin lokal.
+
+Ein Raum synchronisiert sichtbare Figuren, Bewegung und Chat. Gegner, Loot, Aufträge und Charakterfortschritt laufen pro Spieler und werden lokal gespeichert. Räume sind kurzlebig und nutzen Gastnamen.
+
+GitHub Pages bietet den Solo-Modus. Der Online-Modus braucht einen erreichbaren WebSocket-Server. Für den Test im lokalen Netz startest du den Server unter Linux mit `HOST=0.0.0.0 npm start` oder in PowerShell mit `$env:HOST="0.0.0.0"; npm start`. Öffne auf dem Handy `http://<LAN-IP-des-Rechners>:8080`. Für eine HTTPS-Seite trägst du im Online-Menü die `wss://`-Adresse ein. Gib dem Server bei getrenntem Frontend und Backend die erlaubte Seiten-Origin über `ERLENWACHT_ORIGINS` mit.
+
 ## Steuerung
 
 | Aktion | Tastatur und Maus | Touch |
@@ -36,4 +51,4 @@ Am Tor und später am Wachtstein werden Rastpunkte gespeichert. Beute, Ausrüstu
 
 ## Entwicklung
 
-Die [Architektur](docs/ARCHITECTURE.md) beschreibt die Modulgrenzen. Dieser Meilenstein ist ein lokaler Einzelspieler-Prototyp für das spätere MMO-RPG. Netzwerk, Konten und gemeinsame Welten sind künftige Erweiterungen. Der Erlenwacht-Prototyp hat einen eigenständigen Einstieg. Die ursprüngliche [Enklave in PAG](https://github.com/Oitow/pag/tree/main/games/enklave) bleibt ein separates Projekt.
+Die [Architektur](docs/ARCHITECTURE.md) beschreibt die Modulgrenzen. Der Erlenwacht-Prototyp hat einen eigenständigen Einstieg. Die ursprüngliche [Enklave in PAG](https://github.com/Oitow/pag/tree/main/games/enklave) bleibt ein separates Projekt.

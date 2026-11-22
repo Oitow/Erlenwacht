@@ -24,6 +24,7 @@
         </section>
         <nav class="hud-nav" aria-label="Spielmenü">
           <button id="menu-button" type="button" aria-haspopup="dialog" aria-keyshortcuts="M">Menü</button>
+          <button id="online-button" type="button" aria-haspopup="dialog" data-state="idle">Offline</button>
           <button id="chat-button" type="button" aria-haspopup="dialog" aria-keyshortcuts="Enter">Chat <span id="chat-unread" hidden></span></button>
           <button id="bag" type="button" aria-haspopup="dialog" aria-keyshortcuts="I">Beutel <span id="bag-count"></span></button>
         </nav>
@@ -72,6 +73,7 @@
         <nav class="menu-nav" aria-label="Menübereiche">
           <button id="menu-page-button" type="button" aria-controls="menu-page" aria-pressed="true">Übersicht</button>
           <button id="skills-page-button" type="button" aria-controls="skills-page" aria-pressed="false">Fähigkeiten</button>
+          <button id="online-page-button" type="button" aria-controls="online-page" aria-pressed="false">Online</button>
           <button id="chat-page-button" type="button" aria-controls="chat-page" aria-pressed="false">Chat</button>
         </nav>
         <section id="menu-page" aria-label="Übersicht">
@@ -93,15 +95,45 @@
           <p id="skill-feedback" role="status"></p>
           <ul id="skills-list" class="skills-list"></ul>
         </section>
-        <section id="chat-page" aria-label="Lokaler Chat" hidden>
+        <section id="online-page" aria-labelledby="online-title" hidden>
+          <h3 id="online-title">Gemeinsamer Raum</h3>
+          <div id="online-status" role="status" data-state="idle">
+            <strong id="online-state">Offline</strong>
+            <span id="online-status-message">Du spielst allein.</span>
+          </div>
+          <p id="online-peers" hidden></p>
+          <form id="online-form">
+            <fieldset id="online-settings">
+              <div class="online-fields">
+                <label for="online-name">Spielername
+                  <input id="online-name" name="name" type="text" maxlength="24" autocomplete="off" value="Wanderer" required>
+                </label>
+                <label for="online-room">Raumcode
+                  <input id="online-room" name="room" type="text" maxlength="24" autocapitalize="off" autocomplete="off" spellcheck="false" value="lagerfeuer" required>
+                </label>
+              </div>
+              <details id="online-advanced">
+                <summary>Serveradresse</summary>
+                <label for="online-url">WebSocket-Adresse
+                  <input id="online-url" name="url" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" required aria-describedby="online-address-hint">
+                </label>
+                <p id="online-address-hint">Verwendet denselben Server und Raumcode, um euch zu sehen. Über HTTPS braucht der Server eine wss://-Adresse.</p>
+              </details>
+            </fieldset>
+            <button id="online-connect" type="submit">Verbinden</button>
+            <button id="online-disconnect" type="button" hidden>Verbindung trennen</button>
+          </form>
+        </section>
+        <section id="chat-page" aria-labelledby="chat-mode" hidden>
+          <h3 id="chat-mode">Lokaler Chat</h3>
           <div id="chat-log" role="log" aria-label="Nachrichten" tabindex="0">
             <p id="chat-empty">Noch keine Nachrichten.</p>
             <ul id="chat-lines"></ul>
           </div>
           <form id="chat-form" hidden>
-            <label for="chat-message">Lokale Nachricht</label>
+            <label id="chat-message-label" for="chat-message">Lokale Nachricht</label>
             <div class="chat-compose">
-              <input id="chat-message" name="message" type="text" maxlength="160" autocomplete="off" required>
+              <input id="chat-message" name="message" type="text" maxlength="160" autocomplete="off" placeholder="Nachricht oder /hilfe" required>
               <button type="submit">Senden</button>
             </div>
           </form>
